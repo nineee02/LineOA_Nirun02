@@ -30,5 +30,4 @@ func main() {
 
 	fmt.Println("Connected to database successfully!")
 
-	
 }

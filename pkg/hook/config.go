@@ -7,9 +7,9 @@ import (
 	"encoding/base64"
 
 	//"fmt"
-	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 
 	"nirun/pkg/database"
@@ -31,7 +31,7 @@ type Config struct {
 
 // LoadConfig ฟังก์ชันอ่านไฟล์ YAML
 func LoadConfig(filename string) (*Config, error) {
-	data, err := ioutil.ReadFile(filename)
+	data, err := os.ReadFile(filename)
 	if err != nil {
 		return nil, err
 	}
@@ -87,18 +87,17 @@ func HandleLineWebhook(c *gin.Context) {
 				patientInfo, err := models.GetPatientInfoByName(db, name_)
 				if err != nil {
 					log.Println("Error fetching patient info:", err)
-					models.ReplyErrorFormat(bot, event.ReplyToken) // ส่งข้อความแจ้งว่าหาไม่พบ
 					return
 				}
 
 				// ส่งข้อมูลผู้ป่วยกลับไปยังผู้ใช้
 				replyMessage := models.FormatPatientInfo(patientInfo)
-_, err = bot.ReplyMessage(event.ReplyToken, linebot.NewTextMessage(replyMessage)).Do()
-if err != nil {
-	log.Println("Error replying message:", err) // ตรวจสอบว่าเกิด error ในการส่งข้อความกลับหรือไม่
-} else {
-	log.Println("Reply message sent successfully") // Log ว่าส่งข้อความสำเร็จ
-}
+				_, err = bot.ReplyMessage(event.ReplyToken, linebot.NewTextMessage(replyMessage)).Do()
+				if err != nil {
+					log.Println("Error replying message:", err) // ตรวจสอบว่าเกิด error ในการส่งข้อความกลับหรือไม่
+				} else {
+					log.Println("Reply message sent successfully") // Log ว่าส่งข้อความสำเร็จ
+				}
 
 			}
 		}
