@@ -1,6 +1,7 @@
 package event
 
 import (
+	"fmt"
 	"log"
 	"nirun/pkg/database"
 	"nirun/pkg/models"
@@ -28,33 +29,90 @@ func HandleEvent(bot *linebot.Client, event *linebot.Event) {
 		handleNIRUN(bot, event)
 	case "ข้อมูลผู้สูงอายุ":
 		handleElderlyInfoRequest(bot, event, event.Source.UserID)
-	case "ลงเวลาการทำงานสำหรับเจ้าหน้าที":
-		handleWorkTime(bot, event)
-	case "ประวัติการเข้ารับบริการ":
-		handleServiceHistory(bot, event)
+		handleSaveactivityRequest(bot, event, event.Source.UserID)
+	// case "ลงเวลาการทำงานสำหรับเจ้าหน้าที":
+	// 	handleWorkTime(bot, event)
+	// case "ประวัติการเข้ารับบริการ":
+	// 	handleServiceHistory(bot, event)
 	case "บันทึกการเข้ารับบริการ":
-		handleServiceRecord(bot, event)
+		handleServiceRecordRequest(bot, event, event.Source.UserID)
 	case "คู่มือการใช้งานระบบ":
 		handleSystemManual(bot, event)
 	default:
 		handleDefault(bot, event)
 	}
 
-	state, exists := userState[event.Source.UserID]
-	if exists && state == "awaiting_patient_name" {
-		// ถ้าสถานะเป็น "awaiting_patient_name", ให้เรียก handleElderlyInfo
-		handleElderlyInfo(bot, event, event.Source.UserID)
+	state, exists := userState[userID]
+	if exists {
+		switch state {
+		case "wait status ElderlyInfoRequest":
+			handleElderlyInfo(bot, event, userID)
+		case "wait status ServiceRecordRequest":
+			handleServiceRecord(bot, event, userID)
+		case "wait status SaveactivityRequest":
+			handleActivityInput(bot, event, userID)
+		default:
+			log.Printf("Unhandled state for user %s: %s", userID, state)
+		}
 		return
 	}
 
 }
-
-func handleElderlyInfoRequest(bot *linebot.Client, event *linebot.Event, userID string) {
-	userState[userID] = "awaiting_patient_name" // ตั้งสถานะของผู้ใช้
-	log.Println("Waiting for patient name from user:", userID)
+func setUserState(userID, state string) {
+	userState[userID] = state
+	log.Printf("Set user state for user %s to %s", userID, state)
 }
 
-// ฟังก์ชันสำหรับจัดการแต่ละคำสั่ง
+func handleElderlyInfoRequest(bot *linebot.Client, event *linebot.Event, userID string) {
+	setUserState(userID, "wait status ElderlyInfoRequest")
+}
+
+func handleServiceRecordRequest(bot *linebot.Client, event *linebot.Event, userID string) {
+	setUserState(userID, "wait status ServiceRecordRequest")
+}
+func handleSaveactivityRequest(bot *linebot.Client, event *linebot.Event, userID string) {
+	setUserState(userID, "wait status SaveactivityRequest")
+}
+
+// ************************************************************************************************************************
+func handleActivityInput(bot *linebot.Client, event *linebot.Event, userID string) {
+	message, ok := event.Message.(*linebot.TextMessage)
+	if !ok {
+		log.Println("Event is not a text message")
+		return
+	}
+
+	activity := strings.TrimSpace(message.Text)
+	log.Printf("Received activity input: %s", activity)
+
+	if !validateActivity(activity) {
+		sendReply(bot, event.ReplyToken, fmt.Sprintf("กิจกรรม '%s' ไม่ถูกต้อง กรุณาเลือกจากรายการที่กำหนด", activity))
+		return
+	}
+
+	// เชื่อมต่อกับฐานข้อมูล
+	db, err := database.ConnectToDB()
+	if err != nil {
+		log.Printf("Database connection error: %v", err)
+		return
+	}
+	defer db.Close()
+
+	// บันทึกกิจกรรม
+	err = SaveActivity(db, activity)
+	if err != nil {
+		log.Printf("Error saving activity: %v", err)
+		sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการบันทึกกิจกรรม กรุณาลองใหม่")
+		return
+	}
+
+	successMessage := models.FormatSaveactivitysuccess(activity)
+	sendReply(bot, event.ReplyToken, successMessage)
+	log.Printf("Activity '%s' saved successfully", activity)
+	userState[userID] = "" // รีเซ็ตสถานะ
+}
+
+// **********************************************************************************************************
 func handleNIRUN(bot *linebot.Client, event *linebot.Event) {
 	sendReply(bot, event.ReplyToken, "ยินดีต้อนรับสู่ระบบ NIRUN! กรุณาเลือกเมนูที่ต้องการ.")
 }
@@ -98,16 +156,51 @@ func handleElderlyInfo(bot *linebot.Client, event *linebot.Event, userID string)
 	userState[userID] = "" // เปลี่ยนสถานะเพื่อให้พร้อมรับข้อมูลใหม่
 }
 
-func handleWorkTime(bot *linebot.Client, event *linebot.Event) {
-	sendReply(bot, event.ReplyToken, "กรุณาลงเวลาการทำงานโดยกรอกชื่อและเวลาที่ต้องการ:")
-}
+// func handleWorkTime(bot *linebot.Client, event *linebot.Event) {
+// 	sendReply(bot, event.ReplyToken, "กรุณาลงเวลาการทำงานโดยกรอกชื่อและเวลาที่ต้องการ:")
+// }
 
-func handleServiceHistory(bot *linebot.Client, event *linebot.Event) {
-	sendReply(bot, event.ReplyToken, "กรุณากรอกชื่อเพื่อดูประวัติการเข้ารับบริการ:")
-}
+// func handleServiceHistory(bot *linebot.Client, event *linebot.Event) {
+// 	sendReply(bot, event.ReplyToken, "กรุณากรอกชื่อเพื่อดูประวัติการเข้ารับบริการ:")
+// }
 
-func handleServiceRecord(bot *linebot.Client, event *linebot.Event) {
-	sendReply(bot, event.ReplyToken, "กรุณากรอกข้อมูลเพื่อบันทึกการเข้ารับบริการ:")
+func handleServiceRecord(bot *linebot.Client, event *linebot.Event, userID string) {
+	//sendReply(bot, event.ReplyToken, "กรุณากรอกข้อมูลเพื่อบันทึกการเข้ารับบริการ:")
+	message, ok := event.Message.(*linebot.TextMessage)
+	if !ok {
+		log.Println("Event is not a text message")
+		return
+	}
+
+	// ตรวจสอบชื่อผู้ป่วยที่ได้รับ
+	patientName := strings.TrimSpace(message.Text)
+	log.Println("Received patient name:", patientName)
+
+	// เชื่อมต่อกับฐานข้อมูลและค้นหาข้อมูลผู้ป่วย
+	db, err := database.ConnectToDB()
+	if err != nil {
+		log.Println("Database connection error:", err)
+		// sendErrorReply(bot, event, "Unable to connect to the database. Please try again later.")
+		return
+	}
+	defer db.Close()
+
+	// ค้นหาข้อมูลผู้ป่วยจากฐานข้อมูล
+	serviceInfo, err := models.GetServiceInfoByName(db, patientName)
+	if err != nil {
+		log.Println("Error fetching patient info:", err)
+		// sendErrorReply(bot, event, "No patient information found for the provided name.")
+		return
+	}
+
+	// ส่งข้อมูลผู้ป่วยกลับไปยังผู้ใช้
+	replyMessage := models.FormatServiceInfo(serviceInfo)
+	if _, err := bot.ReplyMessage(event.ReplyToken, linebot.NewTextMessage(replyMessage)).Do(); err != nil {
+		log.Println("Error replying message:", err)
+	}
+
+	// เปลี่ยนสถานะผู้ใช้หลังจากได้รับข้อมูล
+	userState[userID] = "" // เปลี่ยนสถานะเพื่อให้พร้อมรับข้อมูลใหม่
 }
 
 func handleSystemManual(bot *linebot.Client, event *linebot.Event) {

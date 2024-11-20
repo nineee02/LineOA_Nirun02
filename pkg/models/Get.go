@@ -26,23 +26,34 @@ func GetPatientInfoByName(db *sql.DB, name_ string) (*PatientInfo, error) {
 }
 
 // ฟังก์ชันสำหรับดึงข้อมูลกิจกรรม
-func GetServiceInfoByName(db *sql.DB, name string) (*ServiceInfo, error) {
-	query := `SELECT id, patiet_id,name_,activity 
+func GetServiceInfoByName(db *sql.DB, name string) ([]ServiceInfo, error) {
+	query := `SELECT patient_info.id, patient_info.patiet_id, patient_info.name_, service_info.activity
 	FROM patient_info
 	INNER JOIN service_info 
-	ON patient_info.id = service_info.service_id WHERE name_ =?`
-	row := db.QueryRow(query, name)
-
-	var serviceInfo ServiceInfo
-	err := row.Scan(&serviceInfo.ID, &serviceInfo.PatientInfo.ID, serviceInfo, &serviceInfo.PatientInfo.Name, &serviceInfo.Activity)
+	ON patient_info.id = service_info.service_id WHERE patient_info.name_ = ?`
+	rows, err := db.Query(query, name)
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("ไม่พบข้อมูลกิจกรรม %s", name)
-		}
 		return nil, err
 	}
-	log.Println("ข้อมูลกิจกรรมที่ดึงมา:", &serviceInfo)
-	return &serviceInfo, nil
+	defer rows.Close()
+
+	var serviceInfos []ServiceInfo
+	for rows.Next() {
+		var serviceInfo ServiceInfo
+		err := rows.Scan(&serviceInfo.PatientInfo.ID, &serviceInfo.PatientInfo.PatientID, &serviceInfo.PatientInfo.Name, &serviceInfo.Activity)
+		if err != nil {
+			return nil, err
+		}
+		//log.Printf("ดึงข้อมูลกิจกรรม: %+v\n", serviceInfo) // ตรวจสอบข้อมูล
+		serviceInfos = append(serviceInfos, serviceInfo)
+	}
+
+	if len(serviceInfos) == 0 {
+		return nil, fmt.Errorf("ไม่พบข้อมูลกิจกรรมสำหรับผู้ป่วย: %s", name)
+	}
+
+	return serviceInfos, nil
+
 }
 
 func GetAllActivity(db *sql.DB, patientID string) ([]ServiceInfo, error) {
@@ -71,15 +82,6 @@ func GetAllActivity(db *sql.DB, patientID string) ([]ServiceInfo, error) {
 
 }
 
-func SaveActivity(db *sql.DB, patientID string, ID int) error {
-	// อัปเดตกิจกรรมที่เลือก
-	query := `UPDATE service_info SET selected = 1 WHERE patient_id = ? AND id = ?`
-	_, err := db.Exec(query, patientID, ID)
-	if err != nil {
-		return fmt.Errorf("ไม่สามารถบันทึกกิจกรรมได้: %v", err)
-	}
-	return nil
-}
 
 // **********************************************************************************************************************
 // FormatPatientInfo จัดรูปแบบข้อมูลผู้ป่วยให้อยู่ในรูปแบบข้อความที่เหมาะสมสำหรับการแสดงผลหรือส่งกลับไปยังผู้ใช้
@@ -98,8 +100,32 @@ func FormatPatientInfo(patient *PatientInfo) string {
 // }
 
 // formatServiceInfo จัดรูปแบบข้อมูลกิจกรรมของผู้สูงอายุให้เหมาะสมสำหรับการแสดงผล
-func FormatServiceInfo(serviceInfo *ServiceInfo) string {
-	return fmt.Sprintf("กรอกข้อมูล:")
+func FormatServiceInfo(serviceInfo []ServiceInfo) string {
+	//var serviceInfos []ServiceInfo
+	if len(serviceInfo) == 0 {
+		return "ไม่พบกิจกรรมสำหรับผู้ป่วยนี้"
+	}
+	message := fmt.Sprintf("ชื่อผู้ป่วย: %s\nกิจกรรมที่บันทึก:\n", serviceInfo[0].PatientInfo.Name)
+	// นำกิจกรรมออกมาแสดงทั้งหมด
+	for _, info := range serviceInfo {
+		message += fmt.Sprintf("- %s\n", info.Activity)
+	}
+
+	// การเลือกกิจกรรมที่ต้องการเพิ่ม
+	activities := []string{
+		"แช่เท้า", "นวด/ประคบ", "ฝังเข็ม", "คาราโอเกะ", "ครอบแก้ว",
+		"ทำอาหาร", "นั่งสมาธิ", "เล่าสู่กัน", "ซุโดกุ", "จับคู่ภาพ",
+	}
+	message += "\nเลือกกิจกรรมที่คุณต้องการเพิ่ม:\n"
+	for _, activity := range activities {
+		message += fmt.Sprintf("- %s\n", activity)
+	}
+	message += "\nเลือกกิจกรรมที่คุณต้องการเพิ่ม:"
+	return message
+
+}
+func FormatSaveactivitysuccess(activity string) string{
+	return fmt.Sprintf("บันทึกกิจกรรม '%s' สำเร็จ!\n", activity)
 }
 
 // ******************************************************************************************************************************************
@@ -123,9 +149,9 @@ func ReplyDataNotFound(bot *linebot.Client, replyToken string) {
 }
 
 // ฟังก์ชัน replyDatabaseError ข้อผิดพลาดในการเชื่อมต่อฐานข้อมูล
-func ReplyDatabaseError(bot *linebot.Client, replyToken string) {
-	dbErrorMessage := "เกิดข้อผิดพลาดในการเชื่อมต่อฐานข้อมูล กรุณาลองใหม่อีกครั้งภายหลัง"
-	if _, err := bot.ReplyMessage(replyToken, linebot.NewTextMessage(dbErrorMessage)).Do(); err != nil {
-		log.Println("Error sending database error message:", err)
-	}
-}
+// func ReplyDatabaseError(bot *linebot.Client, replyToken string) {
+// 	dbErrorMessage := "เกิดข้อผิดพลาดในการเชื่อมต่อฐานข้อมูล กรุณาลองใหม่อีกครั้งภายหลัง"
+// 	if _, err := bot.ReplyMessage(replyToken, linebot.NewTextMessage(dbErrorMessage)).Do(); err != nil {
+// 		log.Println("Error sending database error message:", err)
+// 	}
+// }
