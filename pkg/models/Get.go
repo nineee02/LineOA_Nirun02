@@ -1,26 +1,106 @@
 package models
 
 import (
+	"database/sql"
 	"fmt"
 	"log"
 
 	"github.com/line/line-bot-sdk-go/linebot"
 )
 
+// ฟังก์ชันสำหรับดึงข้อมูลผู้ป่วยตาม Name
+func GetPatientInfoByName(db *sql.DB, name_ string) (*PatientInfo, error) {
+	query := `SELECT name_, patiet_id, age, sex, blood, phone_numbers FROM patient_info WHERE name_ = ?`
+	row := db.QueryRow(query, name_)
+
+	var patientInfo PatientInfo
+	err := row.Scan(&patientInfo.Name, &patientInfo.PatientID, &patientInfo.Age, &patientInfo.Sex, &patientInfo.Blood, &patientInfo.PhoneNumber)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("ไม่พบข้อมูลผู้ป่วยที่มีชื่อ %s", name_)
+		}
+		return nil, err
+	}
+	log.Println("ข้อมูลผู้ป่วยที่ดึงมา:", &patientInfo)
+	return &patientInfo, nil
+}
+
+// ฟังก์ชันสำหรับดึงข้อมูลกิจกรรม
+func GetServiceInfoByName(db *sql.DB, name string) (*ServiceInfo, error) {
+	query := `SELECT id, patiet_id,name_,activity 
+	FROM patient_info
+	INNER JOIN service_info 
+	ON patient_info.id = service_info.service_id WHERE name_ =?`
+	row := db.QueryRow(query, name)
+
+	var serviceInfo ServiceInfo
+	err := row.Scan(&serviceInfo.ID, &serviceInfo.PatientInfo.ID, serviceInfo, &serviceInfo.PatientInfo.Name, &serviceInfo.Activity)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("ไม่พบข้อมูลกิจกรรม %s", name)
+		}
+		return nil, err
+	}
+	log.Println("ข้อมูลกิจกรรมที่ดึงมา:", &serviceInfo)
+	return &serviceInfo, nil
+}
+
+func GetAllActivity(db *sql.DB, patientID string) ([]ServiceInfo, error) {
+	// ดึงข้อมูลกิจกรรมทั้งหมดจากฐานข้อมูล
+	query := `SELECT activity FROM service_info WHERE patient_info = ?`
+	rows, err := db.Query(query, patientID)
+
+	if err != nil {
+		return nil, fmt.Errorf("ไม่สามารถดึงข้อมูลกิจกรรมได้: %v", err)
+	}
+	defer rows.Close()
+
+	//activities คือ Slice ว่างสำหรับเก็บข้อมูลกิจกรรม (Activity) ทั้งหมดที่ดึงมาจากฐานข้อมูล
+	var activities []ServiceInfo
+
+	//วนลูปในผลลัพธ์ที่ได้จากการ Query ฐานข้อมูล
+	for rows.Next() {
+		var activity ServiceInfo //activity เก็บข้อมูลของกิจกรรมที่ได้จากผลลัพธ์
+		err := rows.Scan(&activity.Activity)
+		if err != nil {
+			return nil, err
+		}
+		activities = append(activities, activity)
+	}
+	return activities, nil
+
+}
+
+func SaveActivity(db *sql.DB, patientID string, ID int) error {
+	// อัปเดตกิจกรรมที่เลือก
+	query := `UPDATE service_info SET selected = 1 WHERE patient_id = ? AND id = ?`
+	_, err := db.Exec(query, patientID, ID)
+	if err != nil {
+		return fmt.Errorf("ไม่สามารถบันทึกกิจกรรมได้: %v", err)
+	}
+	return nil
+}
+
+// **********************************************************************************************************************
 // FormatPatientInfo จัดรูปแบบข้อมูลผู้ป่วยให้อยู่ในรูปแบบข้อความที่เหมาะสมสำหรับการแสดงผลหรือส่งกลับไปยังผู้ใช้
 func FormatPatientInfo(patient *PatientInfo) string {
 	return fmt.Sprintf("ข้อมูลผู้ป่วย:\nชื่อ: %s\nรหัสผู้ป่วย: %s\nอายุ: %d\nเพศ: %s\nหมู่เลือด: %s\nหมายเลขโทรศัพท์: %s",
 		patient.Name, patient.PatientID, patient.Age, patient.Sex, patient.Blood, patient.PhoneNumber)
 }
 
-// // formatServiceInfo จัดรูปแบบข้อมูลกิจกรรมของผู้สูงอายุให้เหมาะสมสำหรับการแสดงผล
-// func FormatServiceInfo(serviceInfo *ServiceInfo) string {
-// 	return fmt.Sprintf("ข้อมูลผู้สูงอายุ:\nชื่อ: %s\nรหัสผู้ป่วย: %s\nกิจกรรม: %s\n\nกรุณาพิมพ์ชื่อกิจกรรมที่ต้องการ:",
-// 		serviceInfo.PatientInfo.Name,
-// 		serviceInfo.PatientInfo.PatientID,
-// 		serviceInfo.Activity)
-
+// func FormatAllActivity(activities []ServiceInfo) string {
+//     var message string
+//     message = "กิจกรรมทั้งหมดที่คุณสามารถเลือกได้:\n"
+//     for _, activity := range activities {
+//         message += fmt.Sprintf("- %s\n", activity.Activity)
+//     }
+//     return message
 // }
+
+// formatServiceInfo จัดรูปแบบข้อมูลกิจกรรมของผู้สูงอายุให้เหมาะสมสำหรับการแสดงผล
+func FormatServiceInfo(serviceInfo *ServiceInfo) string {
+	return fmt.Sprintf("กรอกข้อมูล:")
+}
 
 // ******************************************************************************************************************************************
 // replyErrorFormat ส่งข้อความตัวอย่างการใช้งานที่ถูกต้องกลับไปยังผู้ใช้ เมื่อรูปแบบคำสั่งที่ได้รับไม่ถูกต้อง

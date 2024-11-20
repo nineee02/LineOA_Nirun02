@@ -1,59 +1,18 @@
-// pkg/linebot/hook/config.go
 package hook
 
 import (
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/base64"
-
-	//"fmt"
 	"log"
 	"net/http"
-	"os"
 	"strings"
 
-	"nirun/pkg/database"
-	"nirun/pkg/models"
+	"nirun/pkg/event"
+	linebotConfig "nirun/pkg/linebot"
 
 	"github.com/gin-gonic/gin"
 	"github.com/line/line-bot-sdk-go/linebot"
-	"gopkg.in/yaml.v2"
-
-	// ปรับ import path ตามโครงสร้างโปรเจคของคุณ
-	linebotConfig "nirun/pkg/linebot"
 )
 
-type Config struct {
-	LineBot struct {
-		Webhook_url string `yaml:"webhook_url"`
-	} `yaml:"line_bot"`
-}
-
-// LoadConfig ฟังก์ชันอ่านไฟล์ YAML
-func LoadConfig(filename string) (*Config, error) {
-	data, err := os.ReadFile(filename)
-	if err != nil {
-		return nil, err
-	}
-
-	var config Config
-	err = yaml.Unmarshal(data, &config)
-	if err != nil {
-		return nil, err
-	}
-
-	return &config, nil
-}
-
-// VerifySignature ทำการตรวจสอบลายเซ็น
-func VerifySignature(channelSecret string, body []byte, signature string) bool {
-	mac := hmac.New(sha256.New, []byte(channelSecret))
-	mac.Write(body)
-	expectedSignature := base64.StdEncoding.EncodeToString(mac.Sum(nil))
-	return hmac.Equal([]byte(signature), []byte(expectedSignature))
-}
-
-// HandleLineWebhook จัดการ webhook requests จาก LINE
+// HandleLineWebhook - จัดการ Webhook จาก LINE
 func HandleLineWebhook(c *gin.Context) {
 	bot := linebotConfig.GetLineBot()
 	events, err := bot.ParseRequest(c.Request)
@@ -66,49 +25,19 @@ func HandleLineWebhook(c *gin.Context) {
 		return
 	}
 
-	for _, event := range events {
-		log.Println("Event received:", event)
-		if event.Type == linebot.EventTypeMessage {
-			message, ok := event.Message.(*linebot.TextMessage)
+	for _, lineevent := range events {
+		if lineevent.Type == linebot.EventTypeMessage {
+			message, ok := lineevent.Message.(*linebot.TextMessage) //lineevent.Message ข้อความที่ส่งมาจากผู้ใช้
 			if ok {
-				// ใช้ข้อความที่ผู้ใช้ส่งมาเป็นชื่อผู้ป่วย
-				name_ := strings.TrimSpace(message.Text)
-				log.Println("Patient name received:", name_)
+				text := strings.TrimSpace(message.Text)
+				log.Printf("Received message: %s,", text)
 
-				// เชื่อมต่อฐานข้อมูล
-				db, err := database.ConnectToDB()
-				if err != nil {
-					log.Println("Database connection error:", err)
-					return
-				}
-				defer db.Close()
-
-				// ดึงข้อมูลผู้ป่วยตามชื่อ
-				patientInfo, err := models.GetPatientInfoByName(db, name_)
-				if err != nil {
-					log.Println("Error fetching patient info:", err)
-					return
-				}
-
-				// ส่งข้อมูลผู้ป่วยกลับไปยังผู้ใช้
-				replyMessage := models.FormatPatientInfo(patientInfo)
-				_, err = bot.ReplyMessage(event.ReplyToken, linebot.NewTextMessage(replyMessage)).Do()
-				if err != nil {
-					log.Println("Error replying message:", err) // ตรวจสอบว่าเกิด error ในการส่งข้อความกลับหรือไม่
-				} else {
-					log.Println("Reply message sent successfully") // Log ว่าส่งข้อความสำเร็จ
-				}
-
+				// ใช้ฟังก์ชันใน pkg/event เพื่อจัดการข้อความ
+				event.HandleEvent(bot, lineevent)
+				// }
 			}
 		}
+		c.Writer.WriteHeader(http.StatusOK)
+		log.Println("Webhook response sent with status 200")
 	}
-
-	// ส่งสถานะ 200 OK กลับไปหลังจากประมวลผล webhook เสร็จสิ้น
-	c.Writer.WriteHeader(http.StatusOK)
-	log.Println("Webhook response sent with status 200")
-}
-
-// handleEvent จัดการกับแต่ละ event ที่ได้รับจาก LINE
-func HandleEvent(event *linebot.Event) {
-	// TODO: เพิ่มโค้ดจัดการ event ตามที่ต้องการ
 }
