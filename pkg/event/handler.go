@@ -29,7 +29,6 @@ func HandleEvent(bot *linebot.Client, event *linebot.Event) {
 		handleNIRUN(bot, event)
 	case "ข้อมูลผู้สูงอายุ":
 		handleElderlyInfoRequest(bot, event, event.Source.UserID)
-		handleSaveactivityRequest(bot, event, event.Source.UserID)
 	// case "ลงเวลาการทำงานสำหรับเจ้าหน้าที":
 	// 	handleWorkTime(bot, event)
 	// case "ประวัติการเข้ารับบริการ":
@@ -49,7 +48,7 @@ func HandleEvent(bot *linebot.Client, event *linebot.Event) {
 			handleElderlyInfo(bot, event, userID)
 		case "wait status ServiceRecordRequest":
 			handleServiceRecord(bot, event, userID)
-		case "wait status SaveactivityRequest":
+		case "wait for activity input":
 			handleActivityInput(bot, event, userID)
 		default:
 			log.Printf("Unhandled state for user %s: %s", userID, state)
@@ -69,9 +68,6 @@ func handleElderlyInfoRequest(bot *linebot.Client, event *linebot.Event, userID 
 
 func handleServiceRecordRequest(bot *linebot.Client, event *linebot.Event, userID string) {
 	setUserState(userID, "wait status ServiceRecordRequest")
-}
-func handleSaveactivityRequest(bot *linebot.Client, event *linebot.Event, userID string) {
-	setUserState(userID, "wait status SaveactivityRequest")
 }
 
 // ************************************************************************************************************************
@@ -106,9 +102,7 @@ func handleActivityInput(bot *linebot.Client, event *linebot.Event, userID strin
 		return
 	}
 
-	successMessage := models.FormatSaveactivitysuccess(activity)
-	sendReply(bot, event.ReplyToken, successMessage)
-	log.Printf("Activity '%s' saved successfully", activity)
+	sendReply(bot, event.ReplyToken, fmt.Sprintf("บันทึกกิจกรรม '%s' สำเร็จ!", activity))
 	userState[userID] = "" // รีเซ็ตสถานะ
 }
 
