@@ -82,7 +82,6 @@ func GetAllActivity(db *sql.DB, patientID string) ([]ServiceInfo, error) {
 
 }
 
-
 // **********************************************************************************************************************
 // FormatPatientInfo จัดรูปแบบข้อมูลผู้ป่วยให้อยู่ในรูปแบบข้อความที่เหมาะสมสำหรับการแสดงผลหรือส่งกลับไปยังผู้ใช้
 func FormatPatientInfo(patient *PatientInfo) string {
@@ -101,17 +100,18 @@ func FormatPatientInfo(patient *PatientInfo) string {
 
 // formatServiceInfo จัดรูปแบบข้อมูลกิจกรรมของผู้สูงอายุให้เหมาะสมสำหรับการแสดงผล
 func FormatServiceInfo(serviceInfo []ServiceInfo) string {
-	//var serviceInfos []ServiceInfo
+	// ตรวจสอบว่ามีข้อมูลหรือไม่
 	if len(serviceInfo) == 0 {
 		return "ไม่พบกิจกรรมสำหรับผู้ป่วยนี้"
 	}
-	message := fmt.Sprintf("ชื่อผู้ป่วย: %s\nกิจกรรมที่บันทึก:\n", serviceInfo[0].PatientInfo.Name)
-	// นำกิจกรรมออกมาแสดงทั้งหมด
+
+	// สร้างข้อความสำหรับชื่อผู้ป่วยและกิจกรรมที่สำเร็จแล้ว
+	message := fmt.Sprintf("ชื่อผู้ป่วย: %s\nกิจกรรมที่สำเร็จแล้ว:\n", serviceInfo[0].PatientInfo.Name)
 	for _, info := range serviceInfo {
 		message += fmt.Sprintf("- %s\n", info.Activity)
 	}
 
-	// การเลือกกิจกรรมที่ต้องการเพิ่ม
+	// เพิ่มรายการกิจกรรมที่สามารถเลือกเพิ่มได้
 	activities := []string{
 		"แช่เท้า", "นวด/ประคบ", "ฝังเข็ม", "คาราโอเกะ", "ครอบแก้ว",
 		"ทำอาหาร", "นั่งสมาธิ", "เล่าสู่กัน", "ซุโดกุ", "จับคู่ภาพ",
@@ -120,13 +120,13 @@ func FormatServiceInfo(serviceInfo []ServiceInfo) string {
 	for _, activity := range activities {
 		message += fmt.Sprintf("- %s\n", activity)
 	}
-	message += "\nเลือกกิจกรรมที่คุณต้องการเพิ่ม:"
 	return message
+}
 
-}
-func FormatSaveactivitysuccess(activity string) string{
-	return fmt.Sprintf("บันทึกกิจกรรม '%s' สำเร็จ!\n", activity)
-}
+// func FormatSaveactivitysuccess(activity string) string {
+// 	return fmt.Sprintf("บันทึกกิจกรรม '%s' สำเร็จ!\n", activity)
+
+// }
 
 // ******************************************************************************************************************************************
 // replyErrorFormat ส่งข้อความตัวอย่างการใช้งานที่ถูกต้องกลับไปยังผู้ใช้ เมื่อรูปแบบคำสั่งที่ได้รับไม่ถูกต้อง

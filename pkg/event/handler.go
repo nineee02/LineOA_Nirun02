@@ -29,10 +29,10 @@ func HandleEvent(bot *linebot.Client, event *linebot.Event) {
 		handleNIRUN(bot, event)
 	case "ข้อมูลผู้สูงอายุ":
 		handleElderlyInfoRequest(bot, event, event.Source.UserID)
-	// case "ลงเวลาการทำงานสำหรับเจ้าหน้าที":
-	// 	handleWorkTime(bot, event)
-	// case "ประวัติการเข้ารับบริการ":
-	// 	handleServiceHistory(bot, event)
+	case "ลงเวลาการทำงานสำหรับเจ้าหน้าที":
+		handleWorkTime(bot, event)
+	case "ประวัติการเข้ารับบริการ":
+		handleServiceHistory(bot, event)
 	case "บันทึกการเข้ารับบริการ":
 		handleServiceRecordRequest(bot, event, event.Source.UserID)
 	case "คู่มือการใช้งานระบบ":
@@ -48,7 +48,7 @@ func HandleEvent(bot *linebot.Client, event *linebot.Event) {
 			handleElderlyInfo(bot, event, userID)
 		case "wait status ServiceRecordRequest":
 			handleServiceRecord(bot, event, userID)
-		case "wait for activity input":
+		case "wait status SaveInput":
 			handleActivityInput(bot, event, userID)
 		default:
 			log.Printf("Unhandled state for user %s: %s", userID, state)
@@ -71,40 +71,6 @@ func handleServiceRecordRequest(bot *linebot.Client, event *linebot.Event, userI
 }
 
 // ************************************************************************************************************************
-func handleActivityInput(bot *linebot.Client, event *linebot.Event, userID string) {
-	message, ok := event.Message.(*linebot.TextMessage)
-	if !ok {
-		log.Println("Event is not a text message")
-		return
-	}
-
-	activity := strings.TrimSpace(message.Text)
-	log.Printf("Received activity input: %s", activity)
-
-	if !validateActivity(activity) {
-		sendReply(bot, event.ReplyToken, fmt.Sprintf("กิจกรรม '%s' ไม่ถูกต้อง กรุณาเลือกจากรายการที่กำหนด", activity))
-		return
-	}
-
-	// เชื่อมต่อกับฐานข้อมูล
-	db, err := database.ConnectToDB()
-	if err != nil {
-		log.Printf("Database connection error: %v", err)
-		return
-	}
-	defer db.Close()
-
-	// บันทึกกิจกรรม
-	err = SaveActivity(db, activity)
-	if err != nil {
-		log.Printf("Error saving activity: %v", err)
-		sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการบันทึกกิจกรรม กรุณาลองใหม่")
-		return
-	}
-
-	sendReply(bot, event.ReplyToken, fmt.Sprintf("บันทึกกิจกรรม '%s' สำเร็จ!", activity))
-	userState[userID] = "" // รีเซ็ตสถานะ
-}
 
 // **********************************************************************************************************
 func handleNIRUN(bot *linebot.Client, event *linebot.Event) {
@@ -150,13 +116,13 @@ func handleElderlyInfo(bot *linebot.Client, event *linebot.Event, userID string)
 	userState[userID] = "" // เปลี่ยนสถานะเพื่อให้พร้อมรับข้อมูลใหม่
 }
 
-// func handleWorkTime(bot *linebot.Client, event *linebot.Event) {
-// 	sendReply(bot, event.ReplyToken, "กรุณาลงเวลาการทำงานโดยกรอกชื่อและเวลาที่ต้องการ:")
-// }
+func handleWorkTime(bot *linebot.Client, event *linebot.Event) {
+	sendReply(bot, event.ReplyToken, "กรุณาลงเวลาการทำงานโดยกรอกชื่อและเวลาที่ต้องการ:")
+}
 
-// func handleServiceHistory(bot *linebot.Client, event *linebot.Event) {
-// 	sendReply(bot, event.ReplyToken, "กรุณากรอกชื่อเพื่อดูประวัติการเข้ารับบริการ:")
-// }
+func handleServiceHistory(bot *linebot.Client, event *linebot.Event) {
+	sendReply(bot, event.ReplyToken, "กรุณากรอกชื่อเพื่อดูประวัติการเข้ารับบริการ:")
+}
 
 func handleServiceRecord(bot *linebot.Client, event *linebot.Event, userID string) {
 	//sendReply(bot, event.ReplyToken, "กรุณากรอกข้อมูลเพื่อบันทึกการเข้ารับบริการ:")
@@ -189,12 +155,63 @@ func handleServiceRecord(bot *linebot.Client, event *linebot.Event, userID strin
 
 	// ส่งข้อมูลผู้ป่วยกลับไปยังผู้ใช้
 	replyMessage := models.FormatServiceInfo(serviceInfo)
-	if _, err := bot.ReplyMessage(event.ReplyToken, linebot.NewTextMessage(replyMessage)).Do(); err != nil {
+	quickReplyActivities := createQuickReplyActivities()
+
+	if _, err := bot.ReplyMessage(
+		event.ReplyToken,
+		linebot.NewTextMessage(replyMessage).WithQuickReplies(&quickReplyActivities),
+	).Do(); err != nil {
 		log.Println("Error replying message:", err)
 	}
 
 	// เปลี่ยนสถานะผู้ใช้หลังจากได้รับข้อมูล
-	userState[userID] = "" // เปลี่ยนสถานะเพื่อให้พร้อมรับข้อมูลใหม่
+	userState[userID] = "wait status SaveInput"
+	log.Printf("Set user state to wait status SaveInput for user %s", userID)
+}
+
+func handleActivityInput(bot *linebot.Client, event *linebot.Event, userID string) {
+	// ตรวจสอบว่าผู้ใช้อยู่ในสถานะที่ถูกต้องหรือไม่
+	if userState[userID] != "wait status SaveInput" {
+		log.Printf("Invalid state for user %s. Current state: %s", userID, userState[userID])
+		sendReply(bot, event.ReplyToken, "กรุณาเลือกกิจกรรมใหม่:")
+		return
+	}
+
+	// รับข้อความกิจกรรมจากผู้ใช้
+	message, ok := event.Message.(*linebot.TextMessage)
+	if !ok {
+		log.Println("Event is not a text message")
+		return
+	}
+
+	activity := strings.TrimSpace(message.Text)
+	log.Printf("Received activity input: %s", activity)
+
+	if !validateActivity(activity) {
+		sendReply(bot, event.ReplyToken, fmt.Sprintf("กิจกรรม '%s' ไม่ถูกต้อง กรุณาเลือกจากรายการที่กำหนด", activity))
+		return
+	}
+	// เชื่อมต่อกับฐานข้อมูล
+	db, err := database.ConnectToDB()
+	if err != nil {
+		log.Printf("Database connection error: %v", err)
+		sendReply(bot, event.ReplyToken, "ไม่สามารถเชื่อมต่อฐานข้อมูลได้ กรุณาลองใหม่")
+		return
+	}
+	defer db.Close()
+
+	// บันทึกกิจกรรมใหม่
+	if err := SaveActivity(db, activity); err != nil {
+		log.Printf("Error saving activity: %v", err)
+		sendReply(bot, event.ReplyToken, fmt.Sprintf("เกิดข้อผิดพลาดในการบันทึกกิจกรรม '%s' กรุณาลองใหม่", activity))
+		return
+	}
+
+	sendReply(bot, event.ReplyToken, fmt.Sprintf("บันทึกกิจกรรม '%s' สำเร็จ!", activity))
+
+	// รีเซ็ตสถานะผู้ใช้
+	userState[userID] = ""
+	log.Printf("Reset user state for user %s", userID)
 }
 
 func handleSystemManual(bot *linebot.Client, event *linebot.Event) {
