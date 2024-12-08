@@ -68,8 +68,8 @@ func GetServiceInfoBycardID(db *sql.DB, card_id string) ([]PatientInfo, error) {
 
 func ActivityRecord(db *sql.DB, activity *Activityrecord) error {
 	// query สำหรับการบันทึกข้อมูลกิจกรรมลงในฐานข้อมูล
-	query := `INSERT INTO activity_record 
-  				(card_id, activity) 	
+	query := `INSERT INTO activity_record
+  				(card_id, activity)
 				VALUES (?, ?)`
 
 	// ใช้ข้อมูลจาก activity เพื่อบันทึก
@@ -89,6 +89,32 @@ func ActivityRecord(db *sql.DB, activity *Activityrecord) error {
 	// }
 	return nil
 }
+
+// func Activity_Record(db *sql.DB, serviceInfo *ServiceInfo) error {
+// 	// query สำหรับการบันทึกข้อมูลกิจกรรมลงในฐานข้อมูล
+// 	query := `
+// 		INSERT INTO service_info (card_id, service_code, right_to_treatment, service_type, activity, location, start_time, end_time, period, selected)
+// 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+// 	`
+
+// 	// ใช้ข้อมูลจาก serviceInfo เพื่อบันทึก
+// 	_, err := db.Exec(query,
+// 		serviceInfo.CardID,
+// 		serviceInfo.ServiceCode,
+// 		serviceInfo.RightToTreatment,
+// 		serviceInfo.ServiceType,
+// 		serviceInfo.Activity,
+// 		serviceInfo.Location,
+// 		serviceInfo.StartTime_ServiceInfo,
+// 		serviceInfo.EndTime_ServiceInfo,
+// 		serviceInfo.Period_ServiceInfo,
+// 		serviceInfo.Selected)
+
+// 	if err != nil {
+// 		return fmt.Errorf("ไม่สามารถบันทึกกิจกรรม: %v", err)
+// 	}
+// 	return nil
+// }
 
 // func GetEmployee(db *sql.DB, NameEmployee string) (*Employee, error) {
 // 	query := "INSERT INTO employee (username, start_time) VALUES (?, ?)"
