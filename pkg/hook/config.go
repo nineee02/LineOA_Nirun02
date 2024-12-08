@@ -3,7 +3,6 @@ package hook
 import (
 	"log"
 	"net/http"
-	"strings"
 
 	"nirun/pkg/event"
 	linebotConfig "nirun/pkg/linebot"
@@ -25,19 +24,15 @@ func HandleLineWebhook(c *gin.Context) {
 		return
 	}
 
-	for _, lineevent := range events {
-		if lineevent.Type == linebot.EventTypeMessage {
-			message, ok := lineevent.Message.(*linebot.TextMessage) //lineevent.Message ข้อความที่ส่งมาจากผู้ใช้
+	for _, lineEvent := range events {
+		if lineEvent.Type == linebot.EventTypeMessage {
+			message, ok := lineEvent.Message.(*linebot.TextMessage)
 			if ok {
-				text := strings.TrimSpace(message.Text)
-				log.Printf("Received message: %s,", text)
-
-				// ใช้ฟังก์ชันใน pkg/event เพื่อจัดการข้อความ
-				event.HandleEvent(bot, lineevent)
-				// }
+				log.Printf("Received message: %s", message.Text)
+				event.HandleEvent(bot, lineEvent)
 			}
 		}
-		c.Writer.WriteHeader(http.StatusOK)
-		log.Println("Webhook response sent with status 200")
 	}
+	c.Writer.WriteHeader(http.StatusOK)
+	log.Println("Webhook response sent with status 200")
 }

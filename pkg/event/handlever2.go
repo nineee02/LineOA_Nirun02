@@ -16,6 +16,7 @@ func sendCustomReply(bot *linebot.Client, replyToken string, messages ...linebot
 	}
 }
 
+var usercardidState = make(map[string]string)
 var userState = make(map[string]string)
 
 // HandleEvent - จัดการข้อความที่ได้รับจาก LINE
@@ -48,8 +49,8 @@ func HandleEvent(bot *linebot.Client, event *linebot.Event) {
 			handleElderlyInfo(bot, event, userID)
 		case "wait status ServiceRecordRequest":
 			handleServiceRecord(bot, event, userID)
-		case "wait status SaveInput":
-			handleActivityInput(bot, event, userID)
+		case "wait status Activityrecord":
+			handleActivityrecord(bot, event, userID)
 		default:
 			log.Printf("Unhandled state for user %s: %s", userID, state)
 		}
@@ -81,13 +82,13 @@ func handleElderlyInfo(bot *linebot.Client, event *linebot.Event, userID string)
 	// รับข้อความจากผู้ใช้ (ชื่อผู้ป่วย)
 	message, ok := event.Message.(*linebot.TextMessage)
 	if !ok {
-		log.Println("Event is not a text message")
+		log.Println("Event is not a text message (handleElderlyInfo)")
 		return
 	}
 
 	// ตรวจสอบชื่อผู้ป่วยที่ได้รับ
-	patientName := strings.TrimSpace(message.Text)
-	log.Println("Received patient name:", patientName)
+	Name := strings.TrimSpace(message.Text)
+	log.Println("Received Card ID of Patient_info:", Name)
 
 	// เชื่อมต่อกับฐานข้อมูลและค้นหาข้อมูลผู้ป่วย
 	db, err := database.ConnectToDB()
@@ -98,8 +99,8 @@ func handleElderlyInfo(bot *linebot.Client, event *linebot.Event, userID string)
 	}
 	defer db.Close()
 
-	// ค้นหาข้อมูลผู้ป่วยจากฐานข้อมูล
-	patientInfo, err := models.GetPatientInfoByName(db, patientName)
+	// ค้นหาข้อมูลจากฐานข้อมูล
+	patient, err := models.GetPatientInfoByName(db, Name)
 	if err != nil {
 		log.Println("Error fetching patient info:", err)
 		// sendErrorReply(bot, event, "No patient information found for the provided name.")
@@ -107,9 +108,9 @@ func handleElderlyInfo(bot *linebot.Client, event *linebot.Event, userID string)
 	}
 
 	// ส่งข้อมูลผู้ป่วยกลับไปยังผู้ใช้
-	replyMessage := models.FormatPatientInfo(patientInfo)
+	replyMessage := models.FormatPatientInfo(patient)
 	if _, err := bot.ReplyMessage(event.ReplyToken, linebot.NewTextMessage(replyMessage)).Do(); err != nil {
-		log.Println("Error replying message:", err)
+		log.Println("Error replying message:(handleElderlyInfo)", err)
 	}
 
 	// เปลี่ยนสถานะผู้ใช้หลังจากได้รับข้อมูล
@@ -128,13 +129,13 @@ func handleServiceRecord(bot *linebot.Client, event *linebot.Event, userID strin
 	//sendReply(bot, event.ReplyToken, "กรุณากรอกข้อมูลเพื่อบันทึกการเข้ารับบริการ:")
 	message, ok := event.Message.(*linebot.TextMessage)
 	if !ok {
-		log.Println("Event is not a text message")
+		log.Println("Event is not a text message(handleServiceRecord)")
 		return
 	}
 
 	// ตรวจสอบชื่อผู้ป่วยที่ได้รับ
-	patientName := strings.TrimSpace(message.Text)
-	log.Println("Received patient name:", patientName)
+	cardid := strings.TrimSpace(message.Text)
+	log.Println("Received card id :", cardid)
 
 	// เชื่อมต่อกับฐานข้อมูลและค้นหาข้อมูลผู้ป่วย
 	db, err := database.ConnectToDB()
@@ -146,15 +147,15 @@ func handleServiceRecord(bot *linebot.Client, event *linebot.Event, userID strin
 	defer db.Close()
 
 	// ค้นหาข้อมูลผู้ป่วยจากฐานข้อมูล
-	serviceInfo, err := models.GetServiceInfoByName(db, patientName)
+	service, err := models.GetServiceInfoBycardID(db, cardid)
 	if err != nil {
-		log.Println("Error fetching patient info:", err)
+		log.Println("Error models.GetServiceInfoByName:", err)
 		// sendErrorReply(bot, event, "No patient information found for the provided name.")
 		return
 	}
 
 	// ส่งข้อมูลผู้ป่วยกลับไปยังผู้ใช้
-	replyMessage := models.FormatServiceInfo(serviceInfo)
+	replyMessage := models.FormatServiceInfo(service)
 	quickReplyActivities := createQuickReplyActivities()
 
 	if _, err := bot.ReplyMessage(
@@ -164,14 +165,17 @@ func handleServiceRecord(bot *linebot.Client, event *linebot.Event, userID strin
 		log.Println("Error replying message:", err)
 	}
 
+	usercardidState[userID] = cardid
+	log.Printf("Saved card_id for user %s: %s", userID, cardid)
+
 	// เปลี่ยนสถานะผู้ใช้หลังจากได้รับข้อมูล
-	userState[userID] = "wait status SaveInput"
-	log.Printf("Set user state to wait status SaveInput for user %s", userID)
+	userState[userID] = "wait status Activityrecord"
+	log.Printf("Set user state to wait status Activityrecord for user %s", userID)
 }
 
-func handleActivityInput(bot *linebot.Client, event *linebot.Event, userID string) {
+func handleActivityrecord(bot *linebot.Client, event *linebot.Event, userID string) {
 	// ตรวจสอบว่าผู้ใช้อยู่ในสถานะที่ถูกต้องหรือไม่
-	if userState[userID] != "wait status SaveInput" {
+	if userState[userID] != "wait status Activityrecord" {
 		log.Printf("Invalid state for user %s. Current state: %s", userID, userState[userID])
 		sendReply(bot, event.ReplyToken, "กรุณาเลือกกิจกรรมใหม่:")
 		return
@@ -191,6 +195,19 @@ func handleActivityInput(bot *linebot.Client, event *linebot.Event, userID strin
 		sendReply(bot, event.ReplyToken, fmt.Sprintf("กิจกรรม '%s' ไม่ถูกต้อง กรุณาเลือกจากรายการที่กำหนด", activity))
 		return
 	}
+
+	// ดึง card_id จาก userState
+	cardID := usercardidState[userID] // ปรับใช้ให้ตรงตามข้อมูลที่เก็บไว้
+
+	// สร้างตัวแปร activityRecord ที่มีข้อมูลของ card_id และ activity
+	activityRecord := &models.Activityrecord{
+		CardID:   cardID, // ใช้ = แทน := เพราะเป็นการกำหนดค่าตัวแปรที่มีอยู่แล้ว
+		Activity: activity,
+	}
+
+	// แสดง log สำหรับ card_id และ activity
+	log.Printf("Using card_id: %s, Activity: %s", cardID, activity)
+
 	// เชื่อมต่อกับฐานข้อมูล
 	db, err := database.ConnectToDB()
 	if err != nil {
@@ -200,14 +217,14 @@ func handleActivityInput(bot *linebot.Client, event *linebot.Event, userID strin
 	}
 	defer db.Close()
 
-	// บันทึกกิจกรรมใหม่
-	if err := SaveActivity(db, activity); err != nil {
-		log.Printf("Error saving activity: %v", err)
+	// บันทึกกิจกรรมใหม่ models.ActivityRecord(db, activityRecord)
+	if err := models.ActivityRecord(db, activityRecord); err != nil { // ส่ง activityRecord ไปที่ฟังก์ชัน ActivityRecord
+		log.Printf("Error saving activity(models.ActivityRecord): %v", err)
 		sendReply(bot, event.ReplyToken, fmt.Sprintf("เกิดข้อผิดพลาดในการบันทึกกิจกรรม '%s' กรุณาลองใหม่", activity))
 		return
 	}
 
-	sendReply(bot, event.ReplyToken, fmt.Sprintf("บันทึกกิจกรรม '%s' สำเร็จ!", activity))
+	//sendReply(bot, event.ReplyToken, fmt.Sprintf("บันทึกกิจกรรม '%s' สำเร็จสำหรับ card_id '%s'!", activity, cardID))
 
 	// รีเซ็ตสถานะผู้ใช้
 	userState[userID] = ""
@@ -228,3 +245,4 @@ func sendReply(bot *linebot.Client, replyToken, message string) {
 		log.Printf("Error replying message: %v", err)
 	}
 }
+
