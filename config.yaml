@@ -6,8 +6,8 @@ database:
 
 line_bot:
   LINE_CHANNEL_SECRET: 2b5de1f896f32c5deb9cd1fed020e369
-  LINE_CHANNEL_ACCESS_TOKEN: I7R/R4cSPUFz1uPAEPyhESrdtP1tRTydSuLIf4x7PjGi8W3Auyl0qo3pVLRnS6w+Ayhphux2Xqg+xGgyHdbjbNVl6sbU7P7rB0hEI7XzzUwfPEAGSEdxoaGr92Qh3xm6rYftgFaeskTKSxsf7dS13AdB04t89/1O/w1cDnyilFU=
-  webhook_url: "https://572f-49-237-17-12.ngrok-free.app"
+  LINE_CHANNEL_ACCESS_TOKEN: wqxqI1WZYFANu8I/EJ5krYq/cAMT6/xr+msCJ2eDWzzHwragBCAt8Gy2Q/wvJX34Ayhphux2Xqg+xGgyHdbjbNVl6sbU7P7rB0hEI7XzzUweVkEcUik9EuycqhUQlpG4PlwgVjD7YyG5XcDDmTyzDwdB04t89/1O/w1cDnyilFU=
+  webhook_url: "https://b7a4-49-237-47-90.ngrok-free.app"
 
 agent:
   authtoken: 2oWauN3Vju6r1uXmOBz1fAtf2Lw_4LzvJNCvNJ73Yxv84rekw
