@@ -8,16 +8,21 @@ import (
 	"github.com/line/line-bot-sdk-go/linebot"
 )
 
-func FormatPatientInfo(patient *models.PatientInfo) string {
-	return fmt.Sprintf("ข้อมูลผู้ป่วย:\nชื่อ: %s\nรหัสผู้ป่วย: %s\nอายุ: %d\nเพศ: %s\nหมู่เลือด: %s\nหมายเลขโทรศัพท์: %s",
-		patient.Name, patient.PatientID, patient.Age, patient.Sex, patient.Blood, patient.PhoneNumber)
+func FormatGetworktime(employee *models.EmployeeInfo) string {
+	return fmt.Sprintf("ข้อมูลพนักงาน:\nชื่อ: %s\nรหัสพนักงาน: %s\nแผนก: %s\nตำแหน่ง: %s",
+		employee.Name, employee.EmployeeCode, employee.DepartmentInfo.Department, employee.JobPositionInfo.JobPosition)
 }
 
-func FormatServiceInfo(activity []models.PatientInfo) string {
+func FormatPatientInfo(patient *models.PatientInfo) string {
+	return fmt.Sprintf("ข้อมูลผู้สูงอายุ:\nชื่อ: %s\nเลขประจำตัวประชาชน: %s\nรหัสผู้ป่วย: %s\nอายุ: %d\nเพศ: %s\nหมู่เลือด: %s\nหมายเลขโทรศัพท์: %s",
+		patient.Name, patient.CardID, patient.PatientInfo_ID, patient.Age, patient.Sex, patient.BloodInfo.Blood, patient.PhoneNumber, patient)
+}
+
+func FormatServiceInfo(activity []models.Activityrecord) string {
 	// สร้างข้อความสำหรับชื่อผู้ป่วยและกิจกรรมที่สำเร็จแล้ว
-	message := fmt.Sprintf("ชื่อผู้รับบริการ: %s\nกิจกรรมที่สำเร็จแล้ว:\n", activity[0].Name)
+	message := fmt.Sprintf("ชื่อผู้รับบริการ: %s\nกิจกรรมที่สำเร็จแล้ว:\n", activity[0].PatientInfo.Name)
 	for _, info := range activity {
-		message += fmt.Sprintf("- %s\n", info.Activityrecord.Activity)
+		message += fmt.Sprintf("- %s\n", info.ServiceInfo.Activity)
 	}
 
 	// เพิ่มรายการกิจกรรมที่สามารถเลือกเพิ่มได้

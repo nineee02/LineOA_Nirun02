@@ -3,50 +3,108 @@ package models
 import "time"
 
 type PatientInfo struct {
-	Activityrecord   Activityrecord `json:activity_record`
-	CardID           string         `json:"card_id"`
-	PatientID        string         `json:"patient_id"`
-	Name             string         `json:"username"`
-	PhoneNumber      string         `json:"phone_number"`
-	Email            string         `json:"email"`
-	Address          string         `json:"address"`
-	Country          string         `json:"country"`
-	Religion         string         `json:"religion"`
-	Sex              string         `json:"sex"`
-	Blood            string         `json:"blood"`
-	DateOfBirth      string         `json:"date_of_birth"`
-	Age              int            `json:"age"`
-	RightToTreatment string         `json:"right_to_treatment"`
+	PatientInfo_ID       int                  `json:"patient_info_id"`
+	CardID               string               `json:"card_id"`
+	Name                 string               `json:"username"`
+	PhoneNumber          string               `json:"phone_number"`
+	Email                string               `json:"email"`
+	Address              string               `json:"address"`
+	DateOfBirth          string               `json:"date_of_birth"`
+	Age                  int                  `json:"age"`
+	Sex                  string               `json:"sex"`
+	ADL                  string               `json:"ADL"`
+	CreateDate           string               `json:"create_date"`
+	WriteDate            string               `json:"write_date"`
+	BloodInfo            BloodInfo            `json:"blood_info"`
+	Religion             Religion             `json:"religion_info"`
+	CountryInfo          CountryInfo          `json:"country_info"`
+	RightToTreatmentInfo RightToTreatmentInfo `json:"reght_to_treatment_info"`
+}
+
+type BloodInfo struct {
+	BloodInfo_ID int    `json:"blood_info_id"`
+	Blood        string `json:"blood"`
+	CreateDate   string `json:"create_date"`
+	WriteDate    string `json:"write_date"`
+}
+
+type CountryInfo struct {
+	CountryInfo_ID int    `json:"country_info_id"`
+	Country        string `json:"country"`
+	CreateDate     string `json:"create_date"`
+	WriteDate      string `json:"write_date"`
+}
+
+type Religion struct {
+	ReligionInfo_ID int    `json:"religion_info_id"`
+	Religion        string `json:"religion"`
+	CreateDate      string `json:"create_date"`
+	WriteDate       string `json:"write_date"`
+}
+
+type RightToTreatmentInfo struct {
+	RightToTreatmentInfo_ID int    `json:"right_to_treatment_info_id"`
+	Right_to_treatment      string `json:"right_to_treatment"`
+	CreateDate              string `json:"create_date"`
+	WriteDate               string `json:"write_date"`
 }
 
 type ServiceInfo struct {
-	Activity    string `json:"activity"`
-	ServiceType string `json:"service_type"`
-	Location    string `json:"location"`
+	ServiceInfo_Id int    `json:"service_info_id"`
+	Activity       string `json:"activity"`
+	ServiceType    string `json:"service_type"`
+	CreateDate     string `json:"create_date"`
+	WriteDate      string `json:"write_date"`
 }
 
 type Activityrecord struct {
-	Usage_id  int      `json:"Usage_id"`
-	StartTime string   `json:"start_time"`
-	EndTime   time.Time `json:"end_time"`
-	Period    string   `json:"period"`
-	Activity  string   `json:"activity"`
-	CardID    string   `json:"card_id"`
+	ActivityRecord_ID int         `json:"activity_record_id"`
+	StartTime         string      `json:"start_time"`
+	EndTime           time.Time   `json:"end_time"`
+	Period            string      `json:"period"`
+	Evidence_activity []byte      `json:"evidence_activity"`
+	Evidence_time     []byte      `json:"evidence_time"`
+	Location          string      `json:"location"`
+	CreateDate        string      `json:"create_date"`
+	WriteDate         string      `json:"write_date"`
+	ServiceInfo_Id    int         `json:"service_info_id"`
+	PatientInfo_Id    int         `json:"patient_info_id"`
+	PatientInfo       PatientInfo `json:"patient_info"`
+	ServiceInfo       ServiceInfo `json:"service_info"`
 }
 
-type Employee struct {
-	EmployeeID           string `json:"employee_id"`
-	Name_Employee        string `json:"username"`
-	Deployment           string `json:"deployment"`
-	JobPosition          string `json:"job_position"`
-	PhoneNumber_Employee string `json:"phone_number"`
-	Email_Employee       string `json:"email"`
+type EmployeeInfo struct {
+	// WorktimeRecord       WorktimeRecord `json:"worktime_record"`
+	EmployeeInfo_ID int             `json:"employee_info_id"`
+	EmployeeCode    string          `json:"employee_code"`
+	Name            string          `json:"username"`
+	PhoneNumber     string          `json:"phone_number"`
+	Email           string          `json:"email"`
+	CreateDate      string          `json:"create_date"`
+	WriteDate       string          `json:"write_date"`
+	DepartmentInfo  DepartmentInfo  `json:"department_inf"`
+	JobPositionInfo JobPositionInfo `json:"job_position_info"`
+}
+type DepartmentInfo struct {
+	DepartmentInfo_id int    `json:"department_info_id"`
+	Department        string `json:"department"`
+	CreateDate        string `json:"create_date"`
+	WriteDate         string `json:"write_date"`
+}
+type JobPositionInfo struct {
+	JobPositionInfo_id int    `json:"job_position_info_id"`
+	JobPosition        string `json:"job_position"`
+	CreateDate         string `json:"create_date"`
+	WriteDate          string `json:"write_date"`
 }
 
 type WorktimeRecord struct {
-	Worktime_UsagId int    `json:"worktime_usage_id"`
-	EmployeeID      string `json:"employee_id"`
-	CheckIn         string `json:"check_in"`
-	CheckOutn       string `json:"check_out"`
-	Period          string `json:"period"`
+	WorktimeRecord_ID int          `json:"worktime_record_id"`
+	CheckIn           string       `json:"check_in"`
+	CheckOut          string       `json:"check_out"`
+	Period            string       `json:"period"`
+	CreateDate        string       `json:"create_date"`
+	WriteDate         string       `json:"write_date"`
+	EmployeeInfo_ID   int          `json:"employee_info_id"`
+	EmployeeInfo      EmployeeInfo `json:"employee_info"`
 }
