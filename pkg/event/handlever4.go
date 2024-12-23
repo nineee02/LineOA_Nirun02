@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"nirun/pkg/database"
+	"strconv"
 	"strings"
 
 	"github.com/line/line-bot-sdk-go/linebot"
@@ -53,6 +54,10 @@ func HandleEvent(bot *linebot.Client, event *linebot.Event) {
 		switch state {
 		case "wait status NirunRequest":
 			handleNIRUN(bot, event, State)
+		case "wait status worktimeCheckIn":
+			handleworktimeCheckIn(bot, event, State)
+		case "wait status worktimeCheckOut":
+			handleworktimeCheckOut(bot, event, State)
 		case "wait status ElderlyInfoRequest":
 			handlePateintInfo(bot, event, State)
 		case "wait status ServiceRecordRequest":
@@ -61,8 +66,7 @@ func HandleEvent(bot *linebot.Client, event *linebot.Event) {
 			handleActivityrecord(bot, event, State)
 		case "wait status ActivityPeriodRecord":
 			handleActivityPeriodRecord(bot, event, State)
-		case "wait status WorktimeRequest":
-			handleworktimeRecord(bot, event, State)
+
 		default:
 			log.Printf("Unhandled state for user %s: %s", State, state)
 		}
@@ -89,7 +93,7 @@ func handleServiceRecordStste(bot *linebot.Client, event *linebot.Event, State s
 }
 
 func handleWorktimeStste(bot *linebot.Client, event *linebot.Event, State string) {
-	setUserState(State, "wait status WorktimeRequest")
+	setUserState(State, "wait status worktimeCheckIn")
 }
 
 // func handleServiceHistoryStste(bot *linebot.Client, event *linebot.Event, State string) {
@@ -107,8 +111,9 @@ func handleNIRUN(bot *linebot.Client, event *linebot.Event, State string) {
 	sendReply(bot, event.ReplyToken, "ยินดีต้อนรับสู่ระบบ NIRUN! กรุณาเลือกเมนูที่ต้องการ.")
 }
 
-func handleworktimeRecord(bot *linebot.Client, event *linebot.Event, State string) {
-	if userState[State] != "wait status WorktimeRequest" {
+// ลงเวลาเข้างาน
+func handleworktimeCheckIn(bot *linebot.Client, event *linebot.Event, State string) {
+	if userState[State] != "wait status worktimeCheckIn" {
 		log.Printf("Invalid state for user %s. Current state: %s", State, userState[State])
 		return
 	}
@@ -126,7 +131,7 @@ func handleworktimeRecord(bot *linebot.Client, event *linebot.Event, State strin
 		sendReply(bot, event.ReplyToken, "กรุณากรอกรหัสพนักงาน:")
 		return
 	}
-	log.Println("รหัสพนักงาน: %s", employee_code)
+	log.Println("รหัสพนักงาน:", employee_code)
 
 	if len(employee_code) < 6 {
 		sendReply(bot, event.ReplyToken, "รหัสพนักงานไม่ถูกต้อง กรุณากรอกใหม่:")
@@ -141,30 +146,107 @@ func handleworktimeRecord(bot *linebot.Client, event *linebot.Event, State strin
 	}
 	defer db.Close()
 
-	employee, err := GetWorktime(db, employee_code)
+	employeeID, err := GetEmployeeID(db, employee_code)
 	if err != nil {
-		log.Println("Error fetching employee info:", err)
+		log.Println("Error fetching employee ID:", err)
 		sendReply(bot, event.ReplyToken, err.Error())
 		return
 	}
 
-	if employee == nil {
-		log.Printf("No data found for employee_code: %s", message)
-		sendReply(bot, event.ReplyToken, "ไม่พบข้อมูลการทำงานสำหรับรหัสพนักงานนี้.")
+	// เก็บ employeeID ไว้ใน userState
+	userState[State+"_employeeID"] = fmt.Sprintf("%d", employeeID)
+
+	// เช็คการเข้าใช้งานซ้ำ
+	checkedIn, err := IsEmployeeCheckedIn(db, employeeID)
+	if err != nil {
+		log.Println("Error checking employee status:", err)
+		sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการตรวจสอบสถานะ กรุณาลองใหม่.")
 		return
 	}
 
-	replyMessage := FormatGetworktime(employee)
-	log.Printf("Formatted employee data: %s", replyMessage)
+	if checkedIn {
+		sendReply(bot, event.ReplyToken, "มีการเข้าใช้งานระบบแล้ว. คุณต้องการ Check-out หรือไม่? หากใช่ กรุณาพิมพ์ 'Check-out'")
+		userState[State] = "wait status worktimeCheckOut"
+		return
+	}
+
+	// บันทึกการ Check-in
+	err = RecordCheckIn(db, employeeID)
+	if err != nil {
+		log.Println("Error recording Check-in:", err)
+		sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการ Check-in กรุณาลองใหม่.")
+		return
+	}
+	// ดึงข้อมูลพนักงาน
+	employeeInfo, err := GetWorktime(db, employeeID)
+	if err != nil {
+		log.Println("Error fetching employee info:", err)
+		sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการดึงข้อมูลพนักงาน.")
+		return
+	}
+
+	// ใช้ FormatGetworktime เพื่อสร้างข้อความตอบกลับ
+	replyMessage := FormatGetworktime(employeeInfo)
 	if _, err := bot.ReplyMessage(event.ReplyToken, linebot.NewTextMessage(replyMessage)).Do(); err != nil {
-		log.Println("Error replying message:", err)
-		sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการส่งข้อความ กรุณาลองใหม่.")
+		log.Println("Error replying message (handleworktimeCheckIn):", err)
+	}
+	log.Println("Check-in success:", replyMessage)
+	userState[State] = "wait status worktimeCheckOut"
+	log.Printf("State updated for user %s to wait status worktimeCheckOut", State)
+}
+
+// ลงเวลาออกงาน
+func handleworktimeCheckOut(bot *linebot.Client, event *linebot.Event, State string) {
+	if userState[State] != "wait status worktimeCheckOut" {
+		log.Printf("Invalid state for user %s. Current state: %s", State, userState[State])
 		return
 	}
 
+	employeeIDStr, exists := userState[State+"_employeeID"]
+	if !exists {
+		log.Println("Employee ID not found in state")
+		sendReply(bot, event.ReplyToken, "ไม่พบข้อมูลพนักงาน กรุณา Check-in ก่อน.")
+		return
+	}
+
+	employeeID, err := strconv.Atoi(employeeIDStr)
+	if err != nil {
+		log.Println("Error parsing employee ID:", err)
+		sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการดึงข้อมูลพนักงาน.")
+		return
+	}
+
+	db, err := database.ConnectToDB()
+	if err != nil {
+		log.Println("Database connection error:", err)
+		sendReply(bot, event.ReplyToken, "ไม่สามารถเชื่อมต่อฐานข้อมูลได้ กรุณาลองใหม่.")
+		return
+	}
+	defer db.Close()
+
+	// ตรวจสอบสถานะการเช็คอินก่อนทำการ Check-out
+	checkedIn, err := IsEmployeeCheckedIn(db, employeeID)
+	if err != nil {
+		log.Println("Error checking employee status:", err)
+		sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการตรวจสอบสถานะ กรุณาลองใหม่.")
+		return
+	}
+	if !checkedIn {
+		sendReply(bot, event.ReplyToken, "ไม่พบสถานะ Check-in สำหรับพนักงานคนนี้ กรุณา Check-in ก่อน.")
+		return
+	}
+
+	// บันทึกการ Check-out
+	err = RecordCheckOut(db, employeeID)
+	if err != nil {
+		log.Println("Error recording Check-out:", err)
+		sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการ Check-out กรุณาลองใหม่.")
+		return
+	}
+
+	sendReply(bot, event.ReplyToken, "Check-out เรียบร้อยแล้ว! ขอบคุณที่ใช้งานระบบ.")
 	userState[State] = ""
 	log.Printf("State reset for user %s", State)
-
 }
 
 func handlePateintInfo(bot *linebot.Client, event *linebot.Event, State string) {

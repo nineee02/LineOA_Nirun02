@@ -10,22 +10,15 @@ type PatientInfo struct {
 	Email                string               `json:"email"`
 	Address              string               `json:"address"`
 	DateOfBirth          string               `json:"date_of_birth"`
-	Age                  int                  `json:"age"`
+	Age                  string               `json:"age"`
 	Sex                  string               `json:"sex"`
+	Blood                string               `json:"blood_"`
 	ADL                  string               `json:"ADL"`
 	CreateDate           string               `json:"create_date"`
 	WriteDate            string               `json:"write_date"`
-	BloodInfo            BloodInfo            `json:"blood_info"`
 	Religion             Religion             `json:"religion_info"`
 	CountryInfo          CountryInfo          `json:"country_info"`
 	RightToTreatmentInfo RightToTreatmentInfo `json:"reght_to_treatment_info"`
-}
-
-type BloodInfo struct {
-	BloodInfo_ID int    `json:"blood_info_id"`
-	Blood        string `json:"blood"`
-	CreateDate   string `json:"create_date"`
-	WriteDate    string `json:"write_date"`
 }
 
 type CountryInfo struct {
@@ -58,23 +51,23 @@ type ServiceInfo struct {
 }
 
 type Activityrecord struct {
-	ActivityRecord_ID int         `json:"activity_record_id"`
-	StartTime         string      `json:"start_time"`
-	EndTime           time.Time   `json:"end_time"`
-	Period            string      `json:"period"`
-	Evidence_activity []byte      `json:"evidence_activity"`
-	Evidence_time     []byte      `json:"evidence_time"`
-	Location          string      `json:"location"`
-	CreateDate        string      `json:"create_date"`
-	WriteDate         string      `json:"write_date"`
-	ServiceInfo_Id    int         `json:"service_info_id"`
-	PatientInfo_Id    int         `json:"patient_info_id"`
-	PatientInfo       PatientInfo `json:"patient_info"`
-	ServiceInfo       ServiceInfo `json:"service_info"`
+	ActivityRecord_ID int          `json:"activity_record_id"`
+	StartTime         string       `json:"start_time"`
+	EndTime           time.Time    `json:"end_time"`
+	Period            string       `json:"period"`
+	Evidence_activity []byte       `json:"evidence_activity"`
+	Evidence_time     []byte       `json:"evidence_time"`
+	Location          string       `json:"location"`
+	CreateDate        string       `json:"create_date"`
+	WriteDate         string       `json:"write_date"`
+	ServiceInfo_Id    int          `json:"service_info_id"`
+	PatientInfo_Id    int          `json:"patient_info_id"`
+	PatientInfo       PatientInfo  `json:"patient_info"`
+	ServiceInfo       ServiceInfo  `json:"service_info"`
+	EmployeeInfo      EmployeeInfo `json:"employee_info"`
 }
 
 type EmployeeInfo struct {
-	// WorktimeRecord       WorktimeRecord `json:"worktime_record"`
 	EmployeeInfo_ID int             `json:"employee_info_id"`
 	EmployeeCode    string          `json:"employee_code"`
 	Name            string          `json:"username"`

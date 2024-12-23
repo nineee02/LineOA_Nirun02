@@ -9,13 +9,13 @@ import (
 )
 
 func FormatGetworktime(employee *models.EmployeeInfo) string {
-	return fmt.Sprintf("ข้อมูลพนักงาน:\nชื่อ: %s\nรหัสพนักงาน: %s\nแผนก: %s\nตำแหน่ง: %s",
+	return fmt.Sprintf("CHECK_IN SUCCESS!!:\nชื่อ: %s\nรหัสพนักงาน: %s\nแผนก: %s\nตำแหน่ง: %s",
 		employee.Name, employee.EmployeeCode, employee.DepartmentInfo.Department, employee.JobPositionInfo.JobPosition)
 }
 
 func FormatPatientInfo(patient *models.PatientInfo) string {
 	return fmt.Sprintf("ข้อมูลผู้สูงอายุ:\nชื่อ: %s\nเลขประจำตัวประชาชน: %s\nรหัสผู้ป่วย: %s\nอายุ: %d\nเพศ: %s\nหมู่เลือด: %s\nหมายเลขโทรศัพท์: %s",
-		patient.Name, patient.CardID, patient.PatientInfo_ID, patient.Age, patient.Sex, patient.BloodInfo.Blood, patient.PhoneNumber, patient)
+		patient.Name, patient.CardID, patient.PatientInfo_ID, patient.Age, patient.Sex, patient.Blood, patient.PhoneNumber, patient)
 }
 
 func FormatServiceInfo(activity []models.Activityrecord) string {

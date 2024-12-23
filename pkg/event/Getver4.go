@@ -3,64 +3,78 @@ package event
 import (
 	"database/sql"
 	"fmt"
-	"log"
 	"nirun/pkg/models"
 	"time"
 )
 
-func GetWorktime(db *sql.DB, employeeCode string) (*models.EmployeeInfo, error) {
-	query := `SELECT e.employee_info_id, e.employee_code, e.username, e.phone_number, e.email, 
-	d.department, j.job_position
-	FROM employee_info e
-	LEFT JOIN department_info d ON e.department_info_id = d.department_info_id
-	LEFT JOIN job_position_info j ON e.job_position_info_id = j.job_position_info_id
-	WHERE e.employee_code = ?`
+func GetWorktime(db *sql.DB, employeeID int) (*models.EmployeeInfo, error) {
+	query := `SELECT e.employee_info_id, e.employee_code, e.username, d.department, j.job_position
+			  FROM employee_info e
+			  LEFT JOIN department_info d ON e.department_info_id = d.department_info_id
+			  LEFT JOIN job_position_info j ON e.job_position_info_id = j.job_position_info_id
+			  WHERE e.employee_info_id = ?`
 
-	row := db.QueryRow(query, employeeCode)
-
+	row := db.QueryRow(query, employeeID)
 	var employee models.EmployeeInfo
 	var department sql.NullString
 	var jobPosition sql.NullString
 
-	// เพิ่ม log เพื่อช่วย debug
-	// log.Println("Executing query for employee code:", employeeCode)
-	// log.Println("Executing query for employee code:", employeeCode)
-
-	err := row.Scan(
-		&employee.EmployeeInfo_ID,
-		&employee.EmployeeCode,
-		&employee.Name,
-		&employee.PhoneNumber,
-		&employee.Email,
-		&department,
-		&jobPosition,
-	)
+	err := row.Scan(&employee.EmployeeInfo_ID, &employee.EmployeeCode, &employee.Name, &department, &jobPosition)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			log.Printf("No employee found with code: %s", employeeCode)
-			return nil, fmt.Errorf("ไม่มีข้อมูลของพนักงาน %s", employeeCode)
+			return nil, fmt.Errorf("ไม่พบข้อมูลพนักงานสำหรับ ID: %d", employeeID)
 		}
-		log.Println("Error executing query:", err)
-		return nil, err
+		return nil, fmt.Errorf("เกิดข้อผิดพลาดในการดึงข้อมูลพนักงาน: %v", err)
 	}
 
-	// จัดการค่าที่อาจเป็น NULL
+	// จัดการค่า null
 	employee.DepartmentInfo.Department = department.String
 	employee.JobPositionInfo.JobPosition = jobPosition.String
-
-	// Log ข้อมูลที่ได้จากการ Query
-	// log.Println("Query result for employee:", employee)
 
 	return &employee, nil
 }
 
-func InsertWorktime(db *sql.DB, employee_code *models.WorktimeRecord) error {
-	query := `INSERT INTO worktime_record
-			(employee_id, check_in, check_out)
-			VALUES (?, ?, ?)`
-	_, err := db.Exec(query, employee_code.EmployeeInfo.EmployeeCode, employee_code.CheckIn, employee_code.CheckOut)
+
+func GetEmployeeID(db *sql.DB, employeeCode string) (int, error) {
+	var employeeID int
+	query := "SELECT employee_info_id FROM employee_info WHERE employee_code = ?"
+	err := db.QueryRow(query, employeeCode).Scan(&employeeID)
 	if err != nil {
-		return fmt.Errorf("ไม่สามารถบันทึกกิจกรรม: %v", err)
+		if err == sql.ErrNoRows {
+			return 0, fmt.Errorf("ไม่พบข้อมูลสำหรับรหัสพนักงาน: %s", employeeCode)
+		}
+		return 0, fmt.Errorf("เกิดข้อผิดพลาดในการดึงข้อมูล employee_info_id: %v", err)
+	}
+	return employeeID, nil
+}
+
+// ตรวจสอบว่าพนักงานคนนี้มีการเช็คอินอยู่แล้วหรือยัง
+func IsEmployeeCheckedIn(db *sql.DB, employeeID int) (bool, error) {
+	var count int
+	query := "SELECT COUNT(*) FROM worktime_record WHERE employee_info_id = ? AND check_out IS NULL"
+	err := db.QueryRow(query, employeeID).Scan(&count)
+	if err != nil {
+		return false, fmt.Errorf("เกิดข้อผิดพลาดในการตรวจสอบสถานะ: %v", err)
+	}
+	return count > 0, nil
+}
+
+// บันทึกการเช็คอิน
+func RecordCheckIn(db *sql.DB, employeeID int) error {
+	query := "INSERT INTO worktime_record (employee_info_id, check_in) VALUES (?, ?)"
+	_, err := db.Exec(query, employeeID, time.Now())
+	if err != nil {
+		return fmt.Errorf("เกิดข้อผิดพลาดในการบันทึก Check-in: %v", err)
+	}
+	return nil
+}
+
+// บันทึกการเช็คเอ้าท์
+func RecordCheckOut(db *sql.DB, employeeID int) error {
+	query := "UPDATE worktime_record SET check_out = ? WHERE employee_info_id = ? AND check_out IS NULL"
+	_, err := db.Exec(query, time.Now(), employeeID)
+	if err != nil {
+		return fmt.Errorf("เกิดข้อผิดพลาดในการบันทึก Check-out: %v", err)
 	}
 	return nil
 }
@@ -76,6 +90,8 @@ func GetPatientInfoByName(db *sql.DB, card_id string) (*models.Activityrecord, e
 					p.date_of_birth, 
 					p.age,
 					p.sex, 
+					p.blood,
+					p.ADL,
 
 					c.country_info.id, 
 					c.country, 
@@ -86,9 +102,6 @@ func GetPatientInfoByName(db *sql.DB, card_id string) (*models.Activityrecord, e
 					r.religion,
 					r.create_date,
 					r.write_date,
-
-	                b.blood_info_id,
-					b.blood,
 					 
 					rtt.right_to_treatment_info_id, 
     				rtt.right_to_treatment, 
@@ -96,7 +109,6 @@ func GetPatientInfoByName(db *sql.DB, card_id string) (*models.Activityrecord, e
 					rtt.write_date
 					
 	        FROM patient_info p
-			LEFT JOIN blood_info  b ON p.blood_info_id = b.blood_info_id
 			LEFT JOIN country_info  c ON p.country_info_id = c.country_info_id
 			LEFT JOIN religion  r ON p.religion_info_id = r.religion_info_id
 			LEFT JOIN right_to_treatment_info  rtt ON p.right_to_treatment_info_id = r.right_to_treatment_info_id 
@@ -113,11 +125,11 @@ func GetPatientInfoByName(db *sql.DB, card_id string) (*models.Activityrecord, e
 		&patient.PatientInfo.DateOfBirth,
 		&patient.PatientInfo.Age,
 		&patient.PatientInfo.Sex,
+		&patient.PatientInfo.ADL,
+		&patient.PatientInfo.Blood,
 		&patient.PatientInfo.CreateDate,
 		&patient.PatientInfo.WriteDate,
 
-		&patient.PatientInfo.BloodInfo.BloodInfo_ID,
-		&patient.PatientInfo.BloodInfo.Blood,
 		&patient.PatientInfo.CountryInfo.CountryInfo_ID,
 		&patient.PatientInfo.CountryInfo.Country,
 		&patient.PatientInfo.CountryInfo.CreateDate,
