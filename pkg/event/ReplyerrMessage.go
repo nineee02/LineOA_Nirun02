@@ -8,8 +8,12 @@ import (
 	"github.com/line/line-bot-sdk-go/linebot"
 )
 
-func FormatGetworktime(employee *models.EmployeeInfo) string {
-	return fmt.Sprintf("CHECK_IN SUCCESS!!:\nชื่อ: %s\nรหัสพนักงาน: %s\nแผนก: %s\nตำแหน่ง: %s",
+func FormatGetworktimeCheckin(employee *models.EmployeeInfo) string {
+	return fmt.Sprintf("CHECK_IN SUCCESS!!\nชื่อ: %s\nรหัสพนักงาน: %s\nแผนก: %s\nตำแหน่ง: %s",
+		employee.Name, employee.EmployeeCode, employee.DepartmentInfo.Department, employee.JobPositionInfo.JobPosition)
+}
+func FormatGetworktimeCheckout(employee *models.EmployeeInfo) string {
+	return fmt.Sprintf("CHECK_OUT SUCCESS!!\nชื่อ: %s\nรหัสพนักงาน: %s\nแผนก: %s\nตำแหน่ง: %s",
 		employee.Name, employee.EmployeeCode, employee.DepartmentInfo.Department, employee.JobPositionInfo.JobPosition)
 }
 

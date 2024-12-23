@@ -186,11 +186,12 @@ func handleworktimeCheckIn(bot *linebot.Client, event *linebot.Event, State stri
 	}
 
 	// ใช้ FormatGetworktime เพื่อสร้างข้อความตอบกลับ
-	replyMessage := FormatGetworktime(employeeInfo)
+	replyMessage := FormatGetworktimeCheckin(employeeInfo)
 	if _, err := bot.ReplyMessage(event.ReplyToken, linebot.NewTextMessage(replyMessage)).Do(); err != nil {
 		log.Println("Error replying message (handleworktimeCheckIn):", err)
 	}
 	log.Println("Check-in success:", replyMessage)
+
 	userState[State] = "wait status worktimeCheckOut"
 	log.Printf("State updated for user %s to wait status worktimeCheckOut", State)
 }
@@ -243,8 +244,21 @@ func handleworktimeCheckOut(bot *linebot.Client, event *linebot.Event, State str
 		sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการ Check-out กรุณาลองใหม่.")
 		return
 	}
+	// ดึงข้อมูลพนักงาน
+	employeeInfo, err := GetWorktime(db, employeeID)
+	if err != nil {
+		log.Println("Error fetching employee info:", err)
+		sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการดึงข้อมูลพนักงาน.")
+		return
+	}
 
-	sendReply(bot, event.ReplyToken, "Check-out เรียบร้อยแล้ว! ขอบคุณที่ใช้งานระบบ.")
+	// ใช้ FormatGetworktime เพื่อสร้างข้อความตอบกลับ
+	replyMessage := FormatGetworktimeCheckout(employeeInfo)
+	if _, err := bot.ReplyMessage(event.ReplyToken, linebot.NewTextMessage(replyMessage)).Do(); err != nil {
+		log.Println("Error replying message (handleworktimeCheckIn):", err)
+	}
+	log.Println("Check-in success:", replyMessage)
+
 	userState[State] = ""
 	log.Printf("State reset for user %s", State)
 }
