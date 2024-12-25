@@ -8,7 +8,7 @@ line_bot:
   # lineAPIBaseURL: "https://api.line.me/bot/message/reply"
   LINE_CHANNEL_SECRET: 2b5de1f896f32c5deb9cd1fed020e369
   LINE_CHANNEL_ACCESS_TOKEN: wqxqI1WZYFANu8I/EJ5krYq/cAMT6/xr+msCJ2eDWzzHwragBCAt8Gy2Q/wvJX34Ayhphux2Xqg+xGgyHdbjbNVl6sbU7P7rB0hEI7XzzUweVkEcUik9EuycqhUQlpG4PlwgVjD7YyG5XcDDmTyzDwdB04t89/1O/w1cDnyilFU=
-  webhook_url: "https://0321-110-164-198-127.ngrok-free.app"
+  webhook_url: "https://2034-110-164-198-113.ngrok-free.app"
 
 agent:
   authtoken: 2oWauN3Vju6r1uXmOBz1fAtf2Lw_4LzvJNCvNJ73Yxv84rekw

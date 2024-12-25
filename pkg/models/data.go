@@ -12,7 +12,7 @@ type PatientInfo struct {
 	DateOfBirth          string               `json:"date_of_birth"`
 	Age                  string               `json:"age"`
 	Sex                  string               `json:"sex"`
-	Blood                string               `json:"blood_"`
+	Blood                string               `json:"blood"`
 	ADL                  string               `json:"ADL"`
 	CreateDate           string               `json:"create_date"`
 	WriteDate            string               `json:"write_date"`

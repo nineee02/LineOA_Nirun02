@@ -8,18 +8,52 @@ import (
 	"github.com/line/line-bot-sdk-go/linebot"
 )
 
-func FormatGetworktimeCheckin(employee *models.EmployeeInfo) string {
-	return fmt.Sprintf("CHECK_IN SUCCESS!!\nชื่อ: %s\nรหัสพนักงาน: %s\nแผนก: %s\nตำแหน่ง: %s",
-		employee.Name, employee.EmployeeCode, employee.DepartmentInfo.Department, employee.JobPositionInfo.JobPosition)
+func FormatConfirmationCheckIn(worktimeRecord *models.WorktimeRecord) string {
+	return fmt.Sprintf("--ยืนยันการเช็คอิน--\n\n%s\nรหัสพนักงาน: %s",
+		worktimeRecord.EmployeeInfo.Name,
+		worktimeRecord.EmployeeInfo.EmployeeCode)
 }
-func FormatGetworktimeCheckout(employee *models.EmployeeInfo) string {
-	return fmt.Sprintf("CHECK_OUT SUCCESS!!\nชื่อ: %s\nรหัสพนักงาน: %s\nแผนก: %s\nตำแหน่ง: %s",
-		employee.Name, employee.EmployeeCode, employee.DepartmentInfo.Department, employee.JobPositionInfo.JobPosition)
+// func FormatConfirmationCheckIn2(worktimeRecord *models.WorktimeRecord) string {
+// 	return fmt.Sprintf("--ยืนยันการเช็คอิน--\n\n%s\nรหัสพนักงาน: %s",
+// 		worktimeRecord.EmployeeInfo.Name,
+// 		worktimeRecord.EmployeeInfo.EmployeeCode)
+// }
+
+func FormatworktimeCheckin(worktimeRecord *models.WorktimeRecord) string {
+	if worktimeRecord == nil {
+		return "ไม่พบข้อมูลการทำงาน กรุณาลองใหม่."
+	}
+	return fmt.Sprintf("--ยินดีต้อนรับ--\n\nชื่อ: %s\nรหัสพนักงาน: %s\nเช็คอินที่: %s",
+		worktimeRecord.EmployeeInfo.Name,
+		worktimeRecord.EmployeeInfo.EmployeeCode,
+		worktimeRecord.CheckIn)
 }
 
-func FormatPatientInfo(patient *models.PatientInfo) string {
-	return fmt.Sprintf("ข้อมูลผู้สูงอายุ:\nชื่อ: %s\nเลขประจำตัวประชาชน: %s\nรหัสผู้ป่วย: %s\nอายุ: %d\nเพศ: %s\nหมู่เลือด: %s\nหมายเลขโทรศัพท์: %s",
-		patient.Name, patient.CardID, patient.PatientInfo_ID, patient.Age, patient.Sex, patient.Blood, patient.PhoneNumber, patient)
+func FormatConfirmationCheckOut(worktimeRecord *models.WorktimeRecord) string {
+	return fmt.Sprintf("--ยืนยันการเช็คเอ้าท์--\n\n%s\nรหัสพนักงาน: %s",
+		worktimeRecord.EmployeeInfo.Name,
+		worktimeRecord.EmployeeInfo.EmployeeCode)
+}
+
+func FormatworktimeCheckout(worktimeRecord *models.WorktimeRecord) string {
+	return fmt.Sprintf("--ลาก่อน--\n\nชื่อ: %s\nรหัสพนักงาน: %s\nเช็คเอ้าท์ที่: %s",
+		worktimeRecord.EmployeeInfo.Name,
+		worktimeRecord.EmployeeInfo.EmployeeCode,
+		worktimeRecord.CheckOut)
+}
+
+func FormatPatientInfo(patient *models.Activityrecord) string {
+	return fmt.Sprintf(
+		"ข้อมูลผู้ป่วย:\n- ชื่อ: %s\n- เบอร์โทร: %s\n- ที่อยู่: %s\n- อายุ: %s ปี\n- เพศ: %s\n- กลุ่มเลือด: %s\n- ADL %s\n- สิทธิ์การรักษา: %s",
+		patient.PatientInfo.Name,
+		patient.PatientInfo.PhoneNumber,
+		patient.PatientInfo.Address,
+		patient.PatientInfo.Age,
+		patient.PatientInfo.Sex,
+		patient.PatientInfo.Blood,
+		patient.PatientInfo.ADL,
+		patient.PatientInfo.RightToTreatmentInfo.Right_to_treatment,
+	)
 }
 
 func FormatServiceInfo(activity []models.Activityrecord) string {

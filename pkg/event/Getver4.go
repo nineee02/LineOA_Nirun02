@@ -7,31 +7,32 @@ import (
 	"time"
 )
 
-func GetWorktime(db *sql.DB, employeeID int) (*models.EmployeeInfo, error) {
-	query := `SELECT e.employee_info_id, e.employee_code, e.username, d.department, j.job_position
-			  FROM employee_info e
-			  LEFT JOIN department_info d ON e.department_info_id = d.department_info_id
-			  LEFT JOIN job_position_info j ON e.job_position_info_id = j.job_position_info_id
-			  WHERE e.employee_info_id = ?`
+func GetEmployeeInfo(db *sql.DB, employeeCode string) (*models.EmployeeInfo, error) {
+	query := `
+		SELECT employee_info_id, employee_code, username, phone_number, email, create_date, write_date
+		FROM employee_info
+		WHERE employee_code = ?`
 
-	row := db.QueryRow(query, employeeID)
-	var employee models.EmployeeInfo
-	var department sql.NullString
-	var jobPosition sql.NullString
+	row := db.QueryRow(query, employeeCode)
 
-	err := row.Scan(&employee.EmployeeInfo_ID, &employee.EmployeeCode, &employee.Name, &department, &jobPosition)
+	var employeeInfo models.EmployeeInfo
+	err := row.Scan(
+		&employeeInfo.EmployeeInfo_ID,
+		&employeeInfo.EmployeeCode,
+		&employeeInfo.Name,
+		&employeeInfo.PhoneNumber,
+		&employeeInfo.Email,
+		&employeeInfo.CreateDate,
+		&employeeInfo.WriteDate,
+	)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("ไม่พบข้อมูลพนักงานสำหรับ ID: %d", employeeID)
+			return nil, fmt.Errorf("ไม่พบข้อมูลพนักงานสำหรับรหัสพนักงาน: %s", employeeCode)
 		}
 		return nil, fmt.Errorf("เกิดข้อผิดพลาดในการดึงข้อมูลพนักงาน: %v", err)
 	}
 
-	// จัดการค่า null
-	employee.DepartmentInfo.Department = department.String
-	employee.JobPositionInfo.JobPosition = jobPosition.String
-
-	return &employee, nil
+	return &employeeInfo, nil
 }
 
 
@@ -48,6 +49,55 @@ func GetEmployeeID(db *sql.DB, employeeCode string) (int, error) {
 	return employeeID, nil
 }
 
+func GetWorktime(db *sql.DB, employeeCode string) (*models.WorktimeRecord, error) {
+	query := `
+		SELECT wr.worktime_record_id, wr.check_in, wr.check_out, 
+		       e.employee_code, e.username,
+		       d.department, j.job_position
+		FROM worktime_record wr
+		LEFT JOIN employee_info e ON wr.employee_info_id = e.employee_info_id
+		LEFT JOIN department_info d ON e.department_info_id = d.department_info_id
+		LEFT JOIN job_position_info j ON e.job_position_info_id = j.job_position_info_id
+		WHERE e.employee_code = ?
+		ORDER BY wr.check_in DESC
+		LIMIT 1`
+
+	row := db.QueryRow(query, employeeCode)
+
+	var record models.WorktimeRecord
+	var checkOut sql.NullString
+	var department, jobPosition sql.NullString
+
+	err := row.Scan(
+		&record.WorktimeRecord_ID,
+		&record.CheckIn,
+		&checkOut,
+		&record.EmployeeInfo.EmployeeCode,
+		&record.EmployeeInfo.Name,
+		&department,
+		&jobPosition,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil // คืนค่า nil หากไม่มีข้อมูล
+		}
+		return nil, fmt.Errorf("เกิดข้อผิดพลาดในการดึงข้อมูลการทำงาน: %v", err)
+	}
+
+	// จัดการค่า NULL
+	if checkOut.Valid {
+		record.CheckOut = checkOut.String
+	} else {
+		record.CheckOut = ""
+	}
+
+	record.EmployeeInfo.DepartmentInfo.Department = department.String
+	record.EmployeeInfo.JobPositionInfo.JobPosition = jobPosition.String
+
+	return &record, nil
+}
+
+
 // ตรวจสอบว่าพนักงานคนนี้มีการเช็คอินอยู่แล้วหรือยัง
 func IsEmployeeCheckedIn(db *sql.DB, employeeID int) (bool, error) {
 	var count int
@@ -59,7 +109,7 @@ func IsEmployeeCheckedIn(db *sql.DB, employeeID int) (bool, error) {
 	return count > 0, nil
 }
 
-// บันทึกการเช็คอิน
+// บันทึก Check-in
 func RecordCheckIn(db *sql.DB, employeeID int) error {
 	query := "INSERT INTO worktime_record (employee_info_id, check_in) VALUES (?, ?)"
 	_, err := db.Exec(query, employeeID, time.Now())
@@ -69,7 +119,7 @@ func RecordCheckIn(db *sql.DB, employeeID int) error {
 	return nil
 }
 
-// บันทึกการเช็คเอ้าท์
+// บันทึก Check-out
 func RecordCheckOut(db *sql.DB, employeeID int) error {
 	query := "UPDATE worktime_record SET check_out = ? WHERE employee_info_id = ? AND check_out IS NULL"
 	_, err := db.Exec(query, time.Now(), employeeID)
@@ -80,44 +130,44 @@ func RecordCheckOut(db *sql.DB, employeeID int) error {
 }
 
 // GetPatientInfoByName ค้นหาข้อมูลผู้ป่วยจากชื่อ
-func GetPatientInfoByName(db *sql.DB, card_id string) (*models.Activityrecord, error) {
-	query := `SELECT p.card_id,
-					p.patient__info_id,
-					p.username, 
-					p.phone_number, 
-					p.email, 
-					p.address,
-					p.date_of_birth, 
-					p.age,
-					p.sex, 
-					p.blood,
-					p.ADL,
+func GetPatientInfoByName(db *sql.DB, cardID string) (*models.Activityrecord, error) {
+	query := `SELECT 
+				p.card_id,
+				p.patient_info_id,
+				p.username, 
+				p.phone_number, 
+				p.email, 
+				p.address,
+				p.date_of_birth, 
+				p.age,
+				p.sex, 
+				p.blood,
+				p.ADL,
 
-					c.country_info.id, 
-					c.country, 
-					c.create_date,
-					c.write_date,
+				c.country_info_id, 
+				c.country, 
+				c.create_date,
+				c.write_date,
 
-					r.religion_info_id, 
-					r.religion,
-					r.create_date,
-					r.write_date,
-					 
-					rtt.right_to_treatment_info_id, 
-    				rtt.right_to_treatment, 
-					rtt.create_date,
-					rtt.write_date
-					
-	        FROM patient_info p
-			LEFT JOIN country_info  c ON p.country_info_id = c.country_info_id
-			LEFT JOIN religion  r ON p.religion_info_id = r.religion_info_id
-			LEFT JOIN right_to_treatment_info  rtt ON p.right_to_treatment_info_id = r.right_to_treatment_info_id 
-	    	WHERE p.card_id LIKE ?`
+				r.religion_info_id, 
+				r.religion,
+				r.create_date,
+				r.write_date,
+				 
+				rtt.right_to_treatment_info_id, 
+				rtt.right_to_treatment, 
+				rtt.create_date,
+				rtt.write_date
+			FROM patient_info p
+			LEFT JOIN country_info c ON p.country_info_id = c.country_info_id
+			LEFT JOIN religion_info r ON p.religion_info_id = r.religion_info_id
+			LEFT JOIN right_to_treatment_info rtt ON p.right_to_treatment_info_id = rtt.right_to_treatment_info_id 
+			WHERE p.card_id LIKE ?`
 
 	patient := &models.Activityrecord{}
-	err := db.QueryRow(query, "%"+card_id+"%").Scan(
-		&patient.PatientInfo.PatientInfo_ID,
+	err := db.QueryRow(query, "%"+cardID+"%").Scan(
 		&patient.PatientInfo.CardID,
+		&patient.PatientInfo.PatientInfo_ID,
 		&patient.PatientInfo.Name,
 		&patient.PatientInfo.PhoneNumber,
 		&patient.PatientInfo.Email,
@@ -125,26 +175,29 @@ func GetPatientInfoByName(db *sql.DB, card_id string) (*models.Activityrecord, e
 		&patient.PatientInfo.DateOfBirth,
 		&patient.PatientInfo.Age,
 		&patient.PatientInfo.Sex,
-		&patient.PatientInfo.ADL,
 		&patient.PatientInfo.Blood,
-		&patient.PatientInfo.CreateDate,
-		&patient.PatientInfo.WriteDate,
+		&patient.PatientInfo.ADL,
 
 		&patient.PatientInfo.CountryInfo.CountryInfo_ID,
 		&patient.PatientInfo.CountryInfo.Country,
 		&patient.PatientInfo.CountryInfo.CreateDate,
 		&patient.PatientInfo.CountryInfo.WriteDate,
+
 		&patient.PatientInfo.Religion.ReligionInfo_ID,
 		&patient.PatientInfo.Religion.Religion,
 		&patient.PatientInfo.Religion.CreateDate,
 		&patient.PatientInfo.Religion.WriteDate,
+
 		&patient.PatientInfo.RightToTreatmentInfo.RightToTreatmentInfo_ID,
 		&patient.PatientInfo.RightToTreatmentInfo.Right_to_treatment,
 		&patient.PatientInfo.RightToTreatmentInfo.CreateDate,
 		&patient.PatientInfo.RightToTreatmentInfo.WriteDate,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("ไม่พบข้อมูลผู้สูงอายุ: %v", err)
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("ไม่พบข้อมูลผู้สูงอายุ")
+		}
+		return nil, fmt.Errorf("เกิดข้อผิดพลาด: %v", err)
 	}
 	return patient, nil
 }
