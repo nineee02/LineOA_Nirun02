@@ -43,7 +43,7 @@ type RightToTreatmentInfo struct {
 }
 
 type ServiceInfo struct {
-	ServiceInfo_Id int    `json:"service_info_id"`
+	ServiceInfo_ID int    `json:"service_info_id"`
 	Activity       string `json:"activity"`
 	ServiceType    string `json:"service_type"`
 	CreateDate     string `json:"create_date"`
@@ -52,7 +52,7 @@ type ServiceInfo struct {
 
 type Activityrecord struct {
 	ActivityRecord_ID int          `json:"activity_record_id"`
-	StartTime         string       `json:"start_time"`
+	StartTime         time.Time    `json:"start_time"`
 	EndTime           time.Time    `json:"end_time"`
 	Period            string       `json:"period"`
 	Evidence_activity []byte       `json:"evidence_activity"`
@@ -60,8 +60,6 @@ type Activityrecord struct {
 	Location          string       `json:"location"`
 	CreateDate        string       `json:"create_date"`
 	WriteDate         string       `json:"write_date"`
-	ServiceInfo_Id    int          `json:"service_info_id"`
-	PatientInfo_Id    int          `json:"patient_info_id"`
 	PatientInfo       PatientInfo  `json:"patient_info"`
 	ServiceInfo       ServiceInfo  `json:"service_info"`
 	EmployeeInfo      EmployeeInfo `json:"employee_info"`
@@ -93,8 +91,8 @@ type JobPositionInfo struct {
 
 type WorktimeRecord struct {
 	WorktimeRecord_ID int          `json:"worktime_record_id"`
-	CheckIn           string       `json:"check_in"`
-	CheckOut          string       `json:"check_out"`
+	CheckIn           time.Time    `json:"check_in"`
+	CheckOut          time.Time    `json:"check_out"`
 	Period            string       `json:"period"`
 	CreateDate        string       `json:"create_date"`
 	WriteDate         string       `json:"write_date"`

@@ -2,10 +2,7 @@ package event
 
 import (
 	"fmt"
-	"log"
 	"nirun/pkg/models"
-
-	"github.com/line/line-bot-sdk-go/linebot"
 )
 
 func FormatConfirmationCheckIn(worktimeRecord *models.WorktimeRecord) string {
@@ -13,6 +10,7 @@ func FormatConfirmationCheckIn(worktimeRecord *models.WorktimeRecord) string {
 		worktimeRecord.EmployeeInfo.Name,
 		worktimeRecord.EmployeeInfo.EmployeeCode)
 }
+
 // func FormatConfirmationCheckIn2(worktimeRecord *models.WorktimeRecord) string {
 // 	return fmt.Sprintf("--ยืนยันการเช็คอิน--\n\n%s\nรหัสพนักงาน: %s",
 // 		worktimeRecord.EmployeeInfo.Name,
@@ -26,7 +24,7 @@ func FormatworktimeCheckin(worktimeRecord *models.WorktimeRecord) string {
 	return fmt.Sprintf("--ยินดีต้อนรับ--\n\nชื่อ: %s\nรหัสพนักงาน: %s\nเช็คอินที่: %s",
 		worktimeRecord.EmployeeInfo.Name,
 		worktimeRecord.EmployeeInfo.EmployeeCode,
-		worktimeRecord.CheckIn)
+		worktimeRecord.CheckIn.Format("2006-01-02 15:04:05 PM"))
 }
 
 func FormatConfirmationCheckOut(worktimeRecord *models.WorktimeRecord) string {
@@ -39,7 +37,7 @@ func FormatworktimeCheckout(worktimeRecord *models.WorktimeRecord) string {
 	return fmt.Sprintf("--ลาก่อน--\n\nชื่อ: %s\nรหัสพนักงาน: %s\nเช็คเอ้าท์ที่: %s",
 		worktimeRecord.EmployeeInfo.Name,
 		worktimeRecord.EmployeeInfo.EmployeeCode,
-		worktimeRecord.CheckOut)
+		worktimeRecord.CheckOut.Format("2006-01-02 15:04:05 PM"))
 }
 
 func FormatPatientInfo(patient *models.Activityrecord) string {
@@ -58,9 +56,9 @@ func FormatPatientInfo(patient *models.Activityrecord) string {
 
 func FormatServiceInfo(activity []models.Activityrecord) string {
 	// สร้างข้อความสำหรับชื่อผู้ป่วยและกิจกรรมที่สำเร็จแล้ว
-	message := fmt.Sprintf("ชื่อผู้รับบริการ: %s\nกิจกรรมที่สำเร็จแล้ว:\n", activity[0].PatientInfo.Name)
+	message := fmt.Sprintf("ชื่อผู้รับบริการ: %s\n", activity[0].PatientInfo.Name)
 	for _, info := range activity {
-		message += fmt.Sprintf("- %s\n", info.ServiceInfo.Activity)
+		message += fmt.Sprintf(" %s\n", info.ServiceInfo.Activity)
 	}
 
 	// เพิ่มรายการกิจกรรมที่สามารถเลือกเพิ่มได้
@@ -70,37 +68,50 @@ func FormatServiceInfo(activity []models.Activityrecord) string {
 	}
 	message += "\nเลือกกิจกรรมที่คุณต้องการเพิ่ม:\n"
 	for _, activity := range activities {
+
 		message += fmt.Sprintf("- %s\n", activity)
-		for _, activity := range activities {
-			message += fmt.Sprintf("- %s\n", activity)
-		}
-		return message
 	}
 	return message
 }
+func FormatactivityRecordStarttime(starttime []models.Activityrecord) string {
+	var result string
+	for _, record := range starttime {
+		result += fmt.Sprintf(
+			"เริ่มบันทึกกิจกรรม: %s\nของ %s\nที่: %s\n\nกรุณาพิมพ์ 'เสร็จสิ้น' เมื่อทำกิจกรรมเสร็จ",
+			record.ServiceInfo.Activity,
+			record.PatientInfo.Name,
+			record.StartTime.Format("2006-01-02 15:04:05 PM"),
+		)
+	}
+	return result
+}
+func FormatactivityRecordEndtime(endtime []models.Activityrecord) string {
+	var result string
+	for _, record := range endtime {
+		result += fmt.Sprintf(
+			"บันทึกกิจกรรม: %s\nของ %s\nที่: %s\n\n!!!สำเร็จ!!!",
+			record.ServiceInfo.Activity,
+			record.PatientInfo.Name,
+			record.EndTime.Format("2006-01-02 15:04:05 PM"),
+		)
+	}
+	return result
+}
 
-// func FormatEmployee(employeeInfo []models.Employee) string {
-// 	message := fmt.Sprintf("ชื่อพนักงาน: %s\nกิจกรรมที่สำเร็จแล้ว:\n", employeeInfo[0].Name_Employee)
-// 	for _, info := range employeeInfo {
-// 		message += fmt.Sprintf("- %s\n", info.EmployeeID)
+// // *************ReplyError*****************************************************************************************
+// func ReplyErrorFormat(bot *linebot.Client, replyToken string) {
+// 	if _, err := bot.ReplyMessage(
+// 		replyToken,
+// 		linebot.NewTextMessage("กรุณากรอกรูปแบบข้อความให้ถูกต้อง เช่น 'นางสมหวัง สดใส'"),
+// 	).Do(); err != nil {
+// 		log.Println("ReplyErrorFormat:", err)
 // 	}
-// 	return message // คืนค่าข้อความที่สร้างขึ้น
 // }
 
-// *************ReplyError*****************************************************************************************
-func ReplyErrorFormat(bot *linebot.Client, replyToken string) {
-	if _, err := bot.ReplyMessage(
-		replyToken,
-		linebot.NewTextMessage("กรุณากรอกรูปแบบข้อความให้ถูกต้อง เช่น 'นางสมหวัง สดใส'"),
-	).Do(); err != nil {
-		log.Println("ReplyErrorFormat:", err)
-	}
-}
-
-// ฟังก์ชัน replyDataNotFound แจ้งผู้ใช้เมื่อไม่พบข้อมูลผู้สูงอายุ
-func ReplyDataNotFound(bot *linebot.Client, replyToken string) {
-	notFoundMessage := "ไม่พบข้อมูลผู้สูงอายุตามชื่อ กรุณาลองใหม่อีกครั้ง"
-	if _, err := bot.ReplyMessage(replyToken, linebot.NewTextMessage(notFoundMessage)).Do(); err != nil {
-		log.Println("ReplyErrorFormat:", err)
-	}
-}
+// // ฟังก์ชัน replyDataNotFound แจ้งผู้ใช้เมื่อไม่พบข้อมูลผู้สูงอายุ
+// func ReplyDataNotFound(bot *linebot.Client, replyToken string) {
+// 	notFoundMessage := "ไม่พบข้อมูลผู้สูงอายุตามชื่อ กรุณาลองใหม่อีกครั้ง"
+// 	if _, err := bot.ReplyMessage(replyToken, linebot.NewTextMessage(notFoundMessage)).Do(); err != nil {
+// 		log.Println("ReplyErrorFormat:", err)
+// 	}
+// }

@@ -35,7 +35,6 @@ func GetEmployeeInfo(db *sql.DB, employeeCode string) (*models.EmployeeInfo, err
 	return &employeeInfo, nil
 }
 
-
 func GetEmployeeID(db *sql.DB, employeeCode string) (int, error) {
 	var employeeID int
 	query := "SELECT employee_info_id FROM employee_info WHERE employee_code = ?"
@@ -65,7 +64,7 @@ func GetWorktime(db *sql.DB, employeeCode string) (*models.WorktimeRecord, error
 	row := db.QueryRow(query, employeeCode)
 
 	var record models.WorktimeRecord
-	var checkOut sql.NullString
+	var checkOut sql.NullTime
 	var department, jobPosition sql.NullString
 
 	err := row.Scan(
@@ -86,9 +85,9 @@ func GetWorktime(db *sql.DB, employeeCode string) (*models.WorktimeRecord, error
 
 	// จัดการค่า NULL
 	if checkOut.Valid {
-		record.CheckOut = checkOut.String
+		record.CheckOut = checkOut.Time // กรณีที่มีค่า
 	} else {
-		record.CheckOut = ""
+		record.CheckOut = time.Time{} // กรณีไม่มีค่า
 	}
 
 	record.EmployeeInfo.DepartmentInfo.Department = department.String
@@ -96,7 +95,6 @@ func GetWorktime(db *sql.DB, employeeCode string) (*models.WorktimeRecord, error
 
 	return &record, nil
 }
-
 
 // ตรวจสอบว่าพนักงานคนนี้มีการเช็คอินอยู่แล้วหรือยัง
 func IsEmployeeCheckedIn(db *sql.DB, employeeID int) (bool, error) {
@@ -199,20 +197,28 @@ func GetPatientInfoByName(db *sql.DB, cardID string) (*models.Activityrecord, er
 		}
 		return nil, fmt.Errorf("เกิดข้อผิดพลาด: %v", err)
 	}
+	
 	return patient, nil
 }
 
-func GetServiceInfoBycardID(db *sql.DB, card_id string) ([]models.Activityrecord, error) {
-	query := `SELECT p.card_id, 
+func GetServiceInfoBycardID(db *sql.DB, cardID string) ([]models.Activityrecord, error) {
+	query := `SELECT a.avtivity_info_id,
+					a.start_time,
+					a.end_time,
+					p.card_id, 
 					p.username, 
+					p.patient_info_id,
 					s.service_info_id,
-					s.activity,
+					s.activity
+					e.employee_info_id
+					
 			  FROM activity_record a
 			  INNER JOIN patient_info p ON a.patient_info_id = p.patient_info_id
 			  INNER JOIN service_info s ON a.service_info_id = s.service_info_id
-			  WHERE p.crad_id =?`
+			  INNER JOIN employee_info e ON a.employee_info_id = e.employee_info_id
+			  WHERE p.card_id =?`
 
-	rows, err := db.Query(query, card_id)
+	rows, err := db.Query(query, cardID)
 	if err != nil {
 		return nil, err
 	}
@@ -224,54 +230,95 @@ func GetServiceInfoBycardID(db *sql.DB, card_id string) ([]models.Activityrecord
 		var record models.Activityrecord
 		var patientInfo models.PatientInfo
 		var serviceInfo models.ServiceInfo
+		var employeeInfo models.EmployeeInfo
 
 		err := rows.Scan(
+			&record.ActivityRecord_ID,
+			&record.StartTime,
+			&record.EndTime,
 			&patientInfo.CardID,
 			&patientInfo.Name,
-			&serviceInfo.ServiceInfo_Id)
+			&patientInfo.PatientInfo_ID,
+			&serviceInfo.ServiceInfo_ID,
+			&serviceInfo.Activity,
+			&employeeInfo.EmployeeInfo_ID)
 		if err != nil {
 			return nil, err
 		}
 		// Assign ข้อมูลให้กับ Activityrecord
 		record.PatientInfo = patientInfo
 		record.ServiceInfo = serviceInfo
+		record.EmployeeInfo = employeeInfo
 
 		activityrecord = append(activityrecord, record)
 	}
 
 	if len(activityrecord) == 0 {
-		return nil, fmt.Errorf("ไม่พบข้อมูลกิจกรรม: %s", card_id)
+		return nil, fmt.Errorf("ไม่พบข้อมูลกิจกรรม: %s", cardID)
 	}
 
 	return activityrecord, nil
 }
 
-func GetActivityRecord(db *sql.DB, activity *models.Activityrecord) error {
-	// query สำหรับการบันทึกข้อมูลกิจกรรมลงในฐานข้อมูล
-	query := `INSERT INTO activity_record
-	  				(card_id, activity)
-					VALUES (?, ?)`
-
-	// ใช้ข้อมูลจาก activity เพื่อบันทึก
-	_, err := db.Exec(query, activity.PatientInfo.CardID, activity.ServiceInfo.Activity)
+func GetServiceInfoIDByActivity(db *sql.DB, activity string) (int, error) {
+	query := "SELECT service_info_id FROM service_info WHERE activity = ?"
+	var serviceInfoID int
+	err := db.QueryRow(query, activity).Scan(&serviceInfoID)
 	if err != nil {
-		return fmt.Errorf("ไม่สามารถบันทึกกิจกรรม: %v", err)
+		return 0, fmt.Errorf("ไม่พบ service_info_id สำหรับกิจกรรม: %s, error: %v", activity, err)
 	}
+	return serviceInfoID, nil
+}
+
+func SaveActivityRecord(db *sql.DB, activity *models.Activityrecord) error {
+	// ดึง patient_info_id
+	patient, err := GetPatientInfoByName(db, activity.PatientInfo.CardID)
+	if err != nil {
+		return fmt.Errorf("error fetching patient_info_id: %v", err)
+	}
+	activity.PatientInfo.PatientInfo_ID = patient.PatientInfo.PatientInfo_ID
+
+	// ตรวจสอบว่าค่า patient_info_id ถูกต้อง
+	if activity.PatientInfo.PatientInfo_ID == 0 {
+		return fmt.Errorf("patient_info_id is missing or invalid")
+	}
+
+	// ดึง service_info_id
+	serviceInfoID, err := GetServiceInfoIDByActivity(db, activity.ServiceInfo.Activity)
+	if err != nil {
+		return fmt.Errorf("error fetching service_info_id: %v", err)
+	}
+
+	// ตรวจสอบว่า service_info_id มีอยู่จริง
+	if serviceInfoID == 0 {
+		return fmt.Errorf("service_info_id is invalid or missing")
+	}
+
+	// บันทึกลง activity_record
+	query := "INSERT INTO activity_record (patient_info_id, service_info_id, employee_info_id, start_time) VALUES (?, ?, ?, ?)"
+	_, err = db.Exec(query, activity.PatientInfo.PatientInfo_ID, serviceInfoID, activity.EmployeeInfo.EmployeeInfo_ID, time.Now())
+	if err != nil {
+		return fmt.Errorf("error inserting activity record: %v", err)
+	}
+
 	return nil
 }
-func GetActivityPeriodRecord(db *sql.DB, activity *models.Activityrecord) error {
-	// query สำหรับการบันทึกข้อมูลระยะเวลาและเวลาที่กรอก
-	query := `UPDATE activity_record
-			  SET period = ?, end_time = ?
-			  WHERE activity = ?`
 
-	// ใช้ time.Now() สำหรับ end_time
-	endTime := time.Now()
-
-	_, err := db.Exec(query, activity.Period, endTime, activity.ActivityRecord_ID)
-	if err != nil {
-		return fmt.Errorf("ไม่สามารถบันทึกระยะเวลา: %v", err)
+func UpdateActivityEndTime(db *sql.DB, activity *models.Activityrecord) error {
+	if activity.PatientInfo.PatientInfo_ID == 0 {
+		return fmt.Errorf("patient_info_id is invalid")
 	}
+
+	query := `
+    UPDATE activity_record 
+    SET end_time = ? 
+    WHERE patient_info_id = ? AND end_time IS NULL`
+
+	_, err := db.Exec(query, activity.EndTime, activity.PatientInfo.PatientInfo_ID)
+	if err != nil {
+		return fmt.Errorf("error updating end time: %v", err)
+	}
+
 	return nil
 }
 
