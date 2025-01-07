@@ -3,7 +3,9 @@ package event
 import (
 	"database/sql"
 	"fmt"
+	"log"
 	"nirun/pkg/models"
+	"strconv"
 	"time"
 )
 
@@ -197,7 +199,7 @@ func GetPatientInfoByName(db *sql.DB, cardID string) (*models.Activityrecord, er
 		}
 		return nil, fmt.Errorf("เกิดข้อผิดพลาด: %v", err)
 	}
-	
+
 	return patient, nil
 }
 
@@ -321,6 +323,323 @@ func UpdateActivityEndTime(db *sql.DB, activity *models.Activityrecord) error {
 
 	return nil
 }
+func historyALL(db *sql.DB) ([]*models.Activityrecord, error) {
+	query := `SELECT 
+			YEAR(ar.create_date) AS year,
+			s.activity AS activity_type,
+			COUNT(*) AS total
+		FROM 
+			activity_record ar
+		JOIN 
+			service_info s ON ar.service_info_id = s.service_info_id
+		GROUP BY 
+			YEAR(ar.create_date), s.activity
+		ORDER BY 
+			year DESC, activity_type;`
+
+	rows, err := db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var results []*models.Activityrecord
+	for rows.Next() {
+		record := &models.Activityrecord{}
+		detail := &models.ActivityYearDetail{}
+
+		if err := rows.Scan(&detail.Year, &detail.ActivityType, &detail.Total); err != nil {
+			return nil, err
+		}
+		record.ActivityYearDetail = *detail
+		results = append(results, record)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return results, nil
+}
+
+func historyOfYear(db *sql.DB) ([]*models.Activityrecord, error) {
+	query := `
+			SELECT 
+				YEAR(ar.create_date) AS year,
+				s.activity AS activity_type,
+				COUNT(*) AS total
+			FROM 
+				activity_record ar
+			JOIN 
+				service_info s ON ar.service_info_id = s.service_info_id
+			WHERE 
+				YEAR(ar.create_date) = YEAR(CURDATE()) -- เงื่อนไขสำหรับปีปัจจุบัน
+			GROUP BY 
+				YEAR(ar.create_date), s.activity
+			ORDER BY 
+				year DESC, activity_type;
+		`
+	rows, err := db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var results []*models.Activityrecord
+	for rows.Next() {
+		record := &models.Activityrecord{}
+		detail := &models.ActivityYearDetail{}
+
+		if err := rows.Scan(&detail.Year, &detail.ActivityType, &detail.Total); err != nil {
+			return nil, err
+		}
+
+		record.ActivityYearDetail = *detail
+		results = append(results, record)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return results, nil
+}
+
+func historyOfMonth(db *sql.DB) ([]*models.Activityrecord, error) {
+	query := `SELECT 
+		MONTH(ar.create_date) AS month,
+		s.activity AS activity_type,
+		COUNT(*) AS total
+	FROM 
+		activity_record ar
+	JOIN 
+		service_info s ON ar.service_info_id = s.service_info_id
+	WHERE 
+		YEAR(ar.create_date) = YEAR(CURDATE()) -- ตรวจสอบว่าปีปัจจุบัน
+		AND MONTH(ar.create_date) = MONTH(CURDATE()) -- ตรวจสอบว่าเป็นเดือนปัจจุบัน
+	GROUP BY 
+		MONTH(ar.create_date), s.activity
+	ORDER BY 
+		month DESC, activity_type;`
+
+	rows, err := db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var results []*models.Activityrecord
+	for rows.Next() {
+		record := &models.Activityrecord{}
+		detail := &models.ActivityMonthDetail{}
+
+		if err := rows.Scan(&detail.Month, &detail.ActivityType, &detail.Total); err != nil {
+			return nil, err
+		}
+
+		record.ActivityMonthDetail = *detail
+		results = append(results, record)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return results, nil
+}
+
+func historyOfWeek(db *sql.DB) ([]*models.Activityrecord, error) {
+	query := `SELECT 
+                s.activity AS activity_type,
+                COUNT(*) AS total
+          FROM 
+                activity_record ar
+          JOIN 
+                service_info s ON ar.service_info_id = s.service_info_id
+          WHERE 
+                ar.create_date BETWEEN 
+                DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY) 
+                AND 
+                DATE_ADD(CURDATE(), INTERVAL (6 - WEEKDAY(CURDATE())) DAY)
+          GROUP BY 
+                s.activity
+          ORDER BY 
+                total DESC;`
+
+	rows, err := db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var results []*models.Activityrecord
+	for rows.Next() {
+		record := &models.Activityrecord{}
+		detail := &models.ActivityWeekDetail{}
+
+		if err := rows.Scan(&detail.ActivityType, &detail.Total); err != nil {
+			return nil, err
+		}
+
+		record.ActivityWeekDetail = *detail
+		results = append(results, record)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return results, nil
+}
+
+func historyOfDay(db *sql.DB) ([]*models.Activityrecord, error) {
+	query := `SELECT 
+		DAY(ar.create_date) AS day,
+		s.activity AS activity_type,
+		COUNT(*) AS total
+	FROM 
+		activity_record ar
+	JOIN 
+		service_info s ON ar.service_info_id = s.service_info_id
+	WHERE 
+		DAY(ar.create_date) = DAY(CURDATE())
+	GROUP BY 
+		DAY(ar.create_date), s.activity
+	ORDER BY 
+		day DESC, activity_type;`
+
+	rows, err := db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var results []*models.Activityrecord
+	for rows.Next() {
+		record := &models.Activityrecord{}
+		detail := &models.ActivityDayDetail{}
+
+		if err := rows.Scan(&detail.Day, &detail.ActivityType, &detail.Total); err != nil {
+			return nil, err
+		}
+
+		record.ActivityDayDetail = *detail
+		results = append(results, record)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return results, nil
+}
+func historyOfSet(db *sql.DB, startDate, endDate string) ([]*models.Activityrecord, error) {
+	query := `SELECT 
+		DATE(ar.create_date) AS date, 
+		s.activity AS activity_type, 
+		COUNT(*) AS total
+	FROM 
+		activity_record ar
+	JOIN 
+		service_info s ON ar.service_info_id = s.service_info_id
+	WHERE 
+		ar.create_date BETWEEN ? AND ?
+	GROUP BY 
+		DATE(ar.create_date), s.activity
+	ORDER BY 
+		date DESC, activity_type;`
+
+	rows, err := db.Query(query, startDate, endDate)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var results []*models.Activityrecord
+	for rows.Next() {
+		record := &models.Activityrecord{
+			ServiceInfo: models.ServiceInfo{},
+		}
+		detail := &models.ActivitySetDetail{}
+
+		var date string
+		if err := rows.Scan(&date, &record.ServiceInfo.Activity, &detail.Total); err != nil {
+			log.Printf("Error scanning row: %v", err)
+			return nil, err
+		}
+
+		dayInt, err := strconv.Atoi(date[8:10]) // Extract day from date string
+		if err != nil {
+			log.Printf("Error converting date to int: %v", err)
+			return nil, err
+		}
+		detail.Date = dayInt
+		detail.ActivityType = record.ServiceInfo.Activity
+
+		record.ActivitySetDetail = *detail
+		results = append(results, record)
+
+		// Debug log
+		log.Printf("Fetched record: Date=%d, ActivityType=%s, Total=%d", detail.Date, detail.ActivityType, detail.Total)
+	}
+
+	// Ensure a proper return at the end
+	return results, nil
+}
+
+// func ServiceHistory(db *sql.DB,history *models.Activityrecord) ([]models.Activityrecord, error) {
+// 	query := `SELECT a.avtivity_info_id,
+// 					a.start_time,
+// 					a.end_time,
+// 					p.card_id,
+// 					p.username,
+// 					p.patient_info_id,
+// 					s.service_info_id,
+// 					s.activity
+// 					e.employee_info_id
+
+// 			  FROM activity_record a
+// 			  INNER JOIN patient_info p ON a.patient_info_id = p.patient_info_id
+// 			  INNER JOIN service_info s ON a.service_info_id = s.service_info_id
+// 			  INNER JOIN employee_info e ON a.employee_info_id = e.employee_info_id
+// 			  WHERE p.card_id =?`
+
+// 	rows, err := db.Query(query, history.PatientInfo.CardID)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	defer rows.Close()
+
+// 	var activityrecord []models.Activityrecord
+
+// 	for rows.Next() {
+// 		var record models.Activityrecord
+// 		var patientInfo models.PatientInfo
+// 		var serviceInfo models.ServiceInfo
+// 		var employeeInfo models.EmployeeInfo
+
+// 		err := rows.Scan(
+// 			&record.ActivityRecord_ID,
+// 			&record.StartTime,
+// 			&record.EndTime,
+// 			&patientInfo.CardID,
+// 			&patientInfo.Name,
+// 			&patientInfo.PatientInfo_ID,
+// 			&serviceInfo.ServiceInfo_ID,
+// 			&serviceInfo.Activity,
+// 			&employeeInfo.EmployeeInfo_ID)
+// 		if err != nil {
+// 			return nil, err
+// 		}
+// 		// Assign ข้อมูลให้กับ Activityrecord
+// 		record.PatientInfo = patientInfo
+// 		record.ServiceInfo = serviceInfo
+// 		record.EmployeeInfo = employeeInfo
+
+// 		activityrecord = append(activityrecord, record)
+// 	}
+
+// 	if len(activityrecord) == 0 {
+// 		return nil, fmt.Errorf("ไม่พบข้อมูลกิจกรรม: %s", history.PatientInfo.CardID)
+// 	}
+
+// 	return activityrecord, nil
+// }
 
 // **********************************************************************************************************************
 // FormatPatientInfo จัดรูปแบบข้อมูลผู้ป่วยให้อยู่ในรูปแบบข้อความที่เหมาะสมสำหรับการแสดงผลหรือส่งกลับไปยังผู้ใช้

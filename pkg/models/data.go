@@ -51,20 +51,49 @@ type ServiceInfo struct {
 }
 
 type Activityrecord struct {
-	ActivityRecord_ID int          `json:"activity_record_id"`
-	StartTime         time.Time    `json:"start_time"`
-	EndTime           time.Time    `json:"end_time"`
-	Period            string       `json:"period"`
-	Evidence_activity []byte       `json:"evidence_activity"`
-	Evidence_time     []byte       `json:"evidence_time"`
-	Location          string       `json:"location"`
-	CreateDate        string       `json:"create_date"`
-	WriteDate         string       `json:"write_date"`
-	PatientInfo       PatientInfo  `json:"patient_info"`
-	ServiceInfo       ServiceInfo  `json:"service_info"`
-	EmployeeInfo      EmployeeInfo `json:"employee_info"`
+	ActivityRecord_ID   int                 `json:"activity_record_id"`
+	StartTime           time.Time           `json:"start_time"`
+	EndTime             time.Time           `json:"end_time"`
+	Period              string              `json:"period"`
+	Evidence_activity   []byte              `json:"evidence_activity"`
+	Evidence_time       []byte              `json:"evidence_time"`
+	Location            string              `json:"location"`
+	CreateDate          string              `json:"create_date"`
+	WriteDate           string              `json:"write_date"`
+	PatientInfo         PatientInfo         `json:"patient_info"`
+	ServiceInfo         ServiceInfo         `json:"service_info"`
+	EmployeeInfo        EmployeeInfo        `json:"employee_info"`
+	ActivityYearDetail  ActivityYearDetail  `json:"activity_year_detail"`
+	ActivityMonthDetail ActivityMonthDetail `json:"activity_month_detail"`
+	ActivityWeekDetail  ActivityWeekDetail  `json:"activity_week_detail"`
+	ActivityDayDetail   ActivityDayDetail   `json:"activity_day_detail"`
+	ActivitySetDetail   ActivitySetDetail   `json:"activity_set_detail"`
 }
-
+type ActivityYearDetail struct {
+	Year         int    `json:"year"`
+	ActivityType string `json:"activity_type"`
+	Total        int    `json:"total"`
+}
+type ActivityMonthDetail struct {
+	Month        int    `json:"month"`
+	ActivityType string `json:"activity_type"`
+	Total        int    `json:"total"`
+}
+type ActivityWeekDetail struct {
+	Week         int    `json:"week"`
+	ActivityType string `json:"activity_type"`
+	Total        int    `json:"total"`
+}
+type ActivityDayDetail struct {
+	Day          int    `json:"day"`
+	ActivityType string `json:"activity_type"`
+	Total        int    `json:"total"`
+}
+type ActivitySetDetail struct {
+	Date         int    `json:"date"`
+	ActivityType string `json:"activity_type"`
+	Total        int    `json:"total"`
+}
 type EmployeeInfo struct {
 	EmployeeInfo_ID int             `json:"employee_info_id"`
 	EmployeeCode    string          `json:"employee_code"`

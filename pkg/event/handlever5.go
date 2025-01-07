@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"nirun/pkg/database"
+	"nirun/pkg/flex"
 	"nirun/pkg/models"
 	"strconv"
 	"strings"
@@ -41,8 +42,8 @@ func HandleEvent(bot *linebot.Client, event *linebot.Event) {
 		handleElderlyInfoStste(bot, event, event.Source.UserID)
 	case "ลงเวลาเข้าและออกงาน":
 		handleWorktimeStste(bot, event, event.Source.UserID)
-	// case "ประวัติการเข้ารับบริการ":
-	// 	handleServiceHistoryStste(bot, event, event.Source.UserID)
+	case "ประวัติการเข้ารับบริการ":
+		handleServiceHistoryStste(bot, event, event.Source.UserID)
 	case "บันทึกการเข้ารับบริการ":
 		handleServiceRecordStste(bot, event, event.Source.UserID)
 	// case "คู่มือการใช้งานระบบ":
@@ -72,6 +73,20 @@ func HandleEvent(bot *linebot.Client, event *linebot.Event) {
 			handleActivityStart(bot, event, State)
 		case "wait status ActivityEnd":
 			handleActivityEnd(bot, event, State)
+		case "wait status HistoryRequest":
+			handleServiceHistory(bot, event, State)
+		case "wait status HistoryAll":
+			handleActivityHistoryAll(bot, event, State)
+		case "wait status HistoryofYear":
+			handleActivityHistoryofYear(bot, event, State)
+		case "wait status HistoryofMonth":
+			handleActivityHistoryofMonth(bot, event, State)
+		case "wait status HistoryofWeek":
+			handleActivityHistoryofWeek(bot, event, State)
+		case "wait status HistoryofDay":
+			handleActivityHistoryofDay(bot, event, State)
+		case "wait status HistoryofSet":
+			handleActivityHistoryofSet(bot, event, State)
 		default:
 			log.Printf("Unhandled state for user %s: %s", State, State)
 		}
@@ -101,9 +116,9 @@ func handleWorktimeStste(bot *linebot.Client, event *linebot.Event, State string
 	setUserState(State, "wait status worktime")
 }
 
-// func handleServiceHistoryStste(bot *linebot.Client, event *linebot.Event, State string) {
-// 	setUserState(State, "wait status HistoryRequest")
-// }
+func handleServiceHistoryStste(bot *linebot.Client, event *linebot.Event, State string) {
+	setUserState(State, "wait status HistoryRequest")
+}
 
 // func handleSystemManualStste(bot *linebot.Client, event *linebot.Event, State string) {
 // 	setUserState(State, "wait status ManualRequest")
@@ -421,12 +436,10 @@ func handlePateintInfo(bot *linebot.Client, event *linebot.Event, State string) 
 		return
 	}
 
-	// ส่งข้อมูลผู้ป่วยกลับไปยังผู้ใช้
-	replyMessage := FormatPatientInfo(patient)
-	if _, err := bot.ReplyMessage(event.ReplyToken, linebot.NewTextMessage(replyMessage)).Do(); err != nil {
-		log.Println("Error replying message (handlePateintInfo):", err)
+	flexMessage := flex.FormatPatientInfo(patient)
+	if _, err := bot.ReplyMessage(event.ReplyToken, flexMessage).Do(); err != nil {
+		log.Println("Error replying message:", err)
 	}
-	log.Println("ข้อมูลผู้สูงอายุ :", replyMessage)
 
 	// รีเซ็ตสถานะผู้ใช้
 	userState[State] = ""
@@ -504,13 +517,31 @@ func handleServiceInfo(bot *linebot.Client, event *linebot.Event, State string) 
 		return
 	}
 
-	replyMessage := FormatServiceInfo([]models.Activityrecord{*service})
-	log.Println("ข้อมูลผู้สูงอายุ :", replyMessage)
-	// log.Println("reply Message Format: ", replyMessage)
+	// replyMessage := FormatServiceInfo([]models.Activityrecord{*service})
+	// log.Println("ข้อมูลผู้สูงอายุ :", replyMessage)
+	// // log.Println("reply Message Format: ", replyMessage)
+	// quickReplyActivities := createQuickReplyActivities()
+	// if _, err := bot.ReplyMessage(
+	// 	event.ReplyToken,
+	// 	linebot.NewTextMessage(replyMessage).WithQuickReplies(&quickReplyActivities),
+	// ).Do(); err != nil {
+	// 	log.Printf("Error replying message (handleServiceInfo): %v", err)
+	// 	sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการส่งข้อความ กรุณาลองใหม่.")
+	// }
+
+	// สร้าง Flex Message
+	flexMessage := flex.FormatServiceInfo([]models.Activityrecord{*service})
+
+	// สร้าง Quick Replies
 	quickReplyActivities := createQuickReplyActivities()
+
+	// แนบ Quick Replies กับ Flex Message
+	flexMessage.WithQuickReplies(&quickReplyActivities)
+
+	// ส่งข้อความ
 	if _, err := bot.ReplyMessage(
 		event.ReplyToken,
-		linebot.NewTextMessage(replyMessage).WithQuickReplies(&quickReplyActivities),
+		flexMessage,
 	).Do(); err != nil {
 		log.Printf("Error replying message (handleServiceInfo): %v", err)
 		sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการส่งข้อความ กรุณาลองใหม่.")
@@ -640,14 +671,19 @@ func handleActivityStart(bot *linebot.Client, event *linebot.Event, State string
 		return
 	}
 	activityRecord.PatientInfo.Name = patient.PatientInfo.Name
-	replyMessage := FormatactivityRecordStarttime([]models.Activityrecord{*activityRecord})
+
+	flexMessage := flex.FormatactivityRecordStarttime()
+	if _, err := bot.ReplyMessage(event.ReplyToken, flexMessage).Do(); err != nil {
+		log.Println("Error replying message:", err)
+	}
+	log.Println("บันทึกกิจกรรมสำเร็จ :", flexMessage)
 
 	quickReply := linebot.NewQuickReplyItems(
 		linebot.NewQuickReplyButton("", linebot.NewMessageAction("เสร็จสิ้น", "เสร็จสิ้น")),
 	)
 	_, err = bot.ReplyMessage(
 		event.ReplyToken,
-		linebot.NewTextMessage(replyMessage).WithQuickReplies(quickReply),
+		flexMessage.WithQuickReplies(quickReply),
 	).Do()
 	if err != nil {
 		log.Println("Error sending Quick Reply (handleActivityStart):", err)
@@ -768,9 +804,292 @@ func validateActivity(activity string) bool {
 	return false
 }
 
-func handleServiceHistory(bot *linebot.Client, event *linebot.Event) {
-	sendReply(bot, event.ReplyToken, "กรุณากรอกเลขประจำตัวประชาชนเพื่อดูประวัติการเข้ารับบริการ:")
+func handleServiceHistory(bot *linebot.Client, event *linebot.Event, State string) {
+	if userState[State] != "wait status HistoryRequest" {
+		log.Printf("Invalid state for user %s. Current state: %s", State, userState[State])
+		return
+	}
+
+	employeeIDStr, exists := userState[State+"_employeeID"]
+	if !exists {
+		log.Println("Employee ID not found in state")
+		return
+	}
+
+	// แปลง employeeID เป็นตัวเลข
+	employeeID, err := strconv.Atoi(employeeIDStr)
+	if err != nil {
+		log.Println("Error parsing employee ID:", err)
+		return
+	}
+
+	db, err := database.ConnectToDB()
+	if err != nil {
+		log.Println("Database connection error:", err)
+		return
+	}
+	defer db.Close()
+
+	// ตรวจสอบสถานะ Check-in ของพนักงาน
+	checkedIn, err := IsEmployeeCheckedIn(db, employeeID)
+	if err != nil {
+		log.Println("Error checking employee status:", err)
+		return
+	}
+	if !checkedIn {
+		sendReply(bot, event.ReplyToken, "กรุณา Check-in ก่อน\nที่เมนู 'ลงเวลาเข้าและออกงาน'")
+		return
+	}
+
+	// รับข้อความจากผู้ใช้
+	message := event.Message.(*linebot.TextMessage).Text
+	if message == "ประวัติการเข้ารับบริการ" {
+		quickReply := linebot.NewQuickReplyItems(
+			linebot.NewQuickReplyButton("", linebot.NewMessageAction("ทั้งหมด", "ทั้งหมด")),
+			linebot.NewQuickReplyButton("", linebot.NewMessageAction("ปีนี้", "ปีนี้")),
+			linebot.NewQuickReplyButton("", linebot.NewMessageAction("เดือนนี้", "เดือนนี้")),
+			linebot.NewQuickReplyButton("", linebot.NewMessageAction("สัปดาห์นี้", "สัปดาห์นี้")),
+			linebot.NewQuickReplyButton("", linebot.NewMessageAction("วันนี้", "วันนี้")),
+			linebot.NewQuickReplyButton("", linebot.NewMessageAction("ระบุช่วงเวลา", "ระบุช่วงเวลา")),
+		)
+
+		sendReplyWithQuickReply(bot, event.ReplyToken, "กรุณาเลือกประเภทการดูประวัติ:", quickReply)
+		return
+	}
+	if message == "ทั้งหมด" {
+		userState[State] = "wait status HistoryAll"
+		handleActivityHistoryAll(bot, event, State)
+		return
+	} else if message == "ปีนี้" {
+		userState[State] = "wait status HistoryofYear"
+		handleActivityHistoryofYear(bot, event, State)
+		return
+	} else if message == "เดือนนี้" {
+		userState[State] = "wait status HistoryofMonth"
+		handleActivityHistoryofMonth(bot, event, State)
+	} else if message == "สัปดาห์นี้" {
+		userState[State] = "wait status HistoryofWeek"
+		handleActivityHistoryofWeek(bot, event, State)
+	} else if message == "วันนี้" {
+		userState[State] = "wait status HistoryofDay"
+		handleActivityHistoryofDay(bot, event, State)
+	} else if message == "ระบุช่วงเวลา" {
+		userState[State] = "wait status HistoryofSet"
+		handleActivityHistoryofSet(bot, event, State)
+		// sendReply(bot, event.ReplyToken, "กรุณาระบุช่วงวันที่ในรูปแบบ YYYY-MM-DD ถึง YYYY-MM-DD \nเช่น2025-01-01 ถึง 2025-02-01:")
+		return
+	} else {
+		sendReply(bot, event.ReplyToken, "กรุณาเลือกประเภทการดูประวัติอีกครั้ง:")
+		return
+	}
+	log.Printf("Set user state to %s for user %s", userState[State], State)
 }
+func handleActivityHistoryAll(bot *linebot.Client, event *linebot.Event, State string) {
+	log.Println("wait status HistoryoAll:", userState)
+	if userState[State] != "wait status HistoryAll" {
+		log.Printf("Invalid state for user %s. Current state: %s", State, userState[State])
+		return
+	}
+	db, err := database.ConnectToDB()
+	if err != nil {
+		log.Println("Database connection error:", err)
+		// sendReply(bot, event.ReplyToken, "ไม่สามารถเชื่อมต่อฐานข้อมูลได้ กรุณาลองใหม่.")
+		return
+	}
+	defer db.Close()
+	historyRecords, err := historyALL(db)
+	if err != nil {
+		log.Println("Error fetching yearly activity history:", err)
+		sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการดึงข้อมูลปีนี้.")
+		return
+	}
+	replyMessage := FormatHistoryAll(historyRecords)
+	if _, err := bot.ReplyMessage(event.ReplyToken, linebot.NewTextMessage(replyMessage)).Do(); err != nil {
+		log.Println("Error replying message (handleActivityHistoryAll):", err)
+	}
+	log.Println("ประวัติกิจกรรมทั้งหมด:", replyMessage)
+
+	sendReply(bot, event.ReplyToken, replyMessage)
+}
+func handleActivityHistoryofYear(bot *linebot.Client, event *linebot.Event, State string) {
+	log.Println("wait status HistoryofYear:", userState)
+	if userState[State] != "wait status HistoryofYear" {
+		log.Printf("Invalid state for user %s. Current state: %s", State, userState[State])
+		return
+	}
+
+	db, err := database.ConnectToDB()
+	if err != nil {
+		log.Println("Database connection error:", err)
+		// sendReply(bot, event.ReplyToken, "ไม่สามารถเชื่อมต่อฐานข้อมูลได้ กรุณาลองใหม่.")
+		return
+	}
+	defer db.Close()
+	historyRecords, err := historyOfYear(db)
+	if err != nil {
+		log.Println("Error fetching yearly activity history:", err)
+		sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการดึงข้อมูลปีนี้.")
+		return
+	}
+	replyMessage := FormatHistoryofYear(historyRecords)
+	if _, err := bot.ReplyMessage(event.ReplyToken, linebot.NewTextMessage(replyMessage)).Do(); err != nil {
+		log.Println("Error replying message (handleActivityHistoryofYear):", err)
+	}
+	log.Println("ประวัติกิจกรรมปีนี้:", replyMessage)
+
+	sendReply(bot, event.ReplyToken, replyMessage)
+}
+func handleActivityHistoryofMonth(bot *linebot.Client, event *linebot.Event, State string) {
+	log.Println("wait status HistoryofMonth:", userState)
+	if userState[State] != "wait status HistoryofMonth" {
+		log.Printf("Invalid state for user %s. Current state: %s", State, userState[State])
+		return
+	}
+
+	db, err := database.ConnectToDB()
+	if err != nil {
+		log.Println("Database connection error:", err)
+		// sendReply(bot, event.ReplyToken, "ไม่สามารถเชื่อมต่อฐานข้อมูลได้ กรุณาลองใหม่.")
+		return
+	}
+	defer db.Close()
+	historyRecords, err := historyOfMonth(db)
+	if err != nil {
+		log.Println("Error fetching yearly activity history:", err)
+		sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการดึงข้อมูลสัปดาห์นี้.")
+		return
+	}
+	replyMessage := FormatHistoryofMonth(historyRecords)
+	if _, err := bot.ReplyMessage(event.ReplyToken, linebot.NewTextMessage(replyMessage)).Do(); err != nil {
+		log.Println("Error replying message (handleActivityHistoryofMonth):", err)
+	}
+	log.Println("ประวัติกิจกรรมเดือนนี้:", replyMessage)
+
+	sendReply(bot, event.ReplyToken, replyMessage)
+}
+func handleActivityHistoryofWeek(bot *linebot.Client, event *linebot.Event, State string) {
+	log.Println("wait status HistoryofWeek:", userState)
+	if userState[State] != "wait status HistoryofWeek" {
+		log.Printf("Invalid state for user %s. Current state: %s", State, userState[State])
+		return
+	}
+
+	db, err := database.ConnectToDB()
+	if err != nil {
+		log.Println("Database connection error:", err)
+		// sendReply(bot, event.ReplyToken, "ไม่สามารถเชื่อมต่อฐานข้อมูลได้ กรุณาลองใหม่.")
+		return
+	}
+	defer db.Close()
+	historyRecords, err := historyOfWeek(db)
+	if err != nil {
+		log.Println("Error fetching yearly activity history:", err)
+		sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการดึงข้อมูลสัปดาห์นี้.")
+		return
+	}
+	replyMessage := FormatHistoryofWeek(historyRecords)
+	if _, err := bot.ReplyMessage(event.ReplyToken, linebot.NewTextMessage(replyMessage)).Do(); err != nil {
+		log.Println("Error replying message (handleActivityHistoryofWeek):", err)
+	}
+	log.Println("ประวัติกิจกรรมสัปดาห์นี้:", replyMessage)
+
+	sendReply(bot, event.ReplyToken, replyMessage)
+}
+func handleActivityHistoryofDay(bot *linebot.Client, event *linebot.Event, State string) {
+	log.Println("wait status HistoryofDay:", userState)
+	if userState[State] != "wait status HistoryofDay" {
+		log.Printf("Invalid state for user %s. Current state: %s", State, userState[State])
+		return
+	}
+
+	db, err := database.ConnectToDB()
+	if err != nil {
+		log.Println("Database connection error:", err)
+		// sendReply(bot, event.ReplyToken, "ไม่สามารถเชื่อมต่อฐานข้อมูลได้ กรุณาลองใหม่.")
+		return
+	}
+	defer db.Close()
+	historyRecords, err := historyOfDay(db)
+	if err != nil {
+		log.Println("Error fetching yearly activity history:", err)
+		sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการดึงข้อมูลสัปดาห์นี้.")
+		return
+	}
+	replyMessage := FormatHistoryofDay(historyRecords)
+	if _, err := bot.ReplyMessage(event.ReplyToken, linebot.NewTextMessage(replyMessage)).Do(); err != nil {
+		log.Println("Error replying message (handleActivityHistoryofDay):", err)
+	}
+	log.Println("ประวัติกิจกรรมวันนี้:", replyMessage)
+
+	sendReply(bot, event.ReplyToken, replyMessage)
+}
+func handleActivityHistoryofSet(bot *linebot.Client, event *linebot.Event, State string) {
+	log.Println("wait status HistoryofSet:", userState)
+	if userState[State] != "wait status HistoryofSet" {
+		log.Printf("Invalid state for user %s. Current state: %s", State, userState[State])
+		return
+	}
+
+	message := event.Message.(*linebot.TextMessage).Text
+	log.Println("Received message:", message)
+
+	// แยกข้อความเพื่อดึงช่วงวันที่
+	dates := strings.Split(message, "ถึง")
+	log.Println("Split dates:", dates)
+
+	if len(dates) != 2 {
+		sendReply(bot, event.ReplyToken, "กรุณาระบุช่วงวันที่ในรูปแบบ YYYY-MM-DD ถึง YYYY-MM-DD\nตัวอย่าง: 2025-01-01 ถึง 2025-02-01")
+		return
+	}
+
+	startDate := strings.TrimSpace(dates[0])
+	endDate := strings.TrimSpace(dates[1])
+	log.Printf("Parsed startDate: %s, endDate: %s", startDate, endDate)
+
+	// ตรวจสอบรูปแบบวันที่
+	if _, err := time.Parse("2006-01-02", startDate); err != nil {
+		sendReply(bot, event.ReplyToken, "รูปแบบวันที่เริ่มต้นไม่ถูกต้อง กรุณาระบุในรูปแบบ YYYY-MM-DD เช่น 2025-01-01")
+		return
+	}
+	if _, err := time.Parse("2006-01-02", endDate); err != nil {
+		sendReply(bot, event.ReplyToken, "รูปแบบวันที่สิ้นสุดไม่ถูกต้อง กรุณาระบุในรูปแบบ YYYY-MM-DD เช่น 2025-02-01")
+		return
+	}
+
+	startDateWithTime := startDate + " 00:00:00"
+	endDateWithTime := endDate + " 23:59:59"
+	log.Printf("StartDateWithTime: %s, EndDateWithTime: %s", startDateWithTime, endDateWithTime)
+
+	// เชื่อมต่อฐานข้อมูล
+	db, err := database.ConnectToDB()
+	if err != nil {
+		log.Println("Database connection error:", err)
+		sendReply(bot, event.ReplyToken, "ไม่สามารถเชื่อมต่อฐานข้อมูลได้ กรุณาลองใหม่.")
+		return
+	}
+	defer db.Close()
+
+	historyRecords, err := historyOfSet(db, startDateWithTime, endDateWithTime)
+	if err != nil {
+		log.Println("Error fetching activity history:", err)
+		sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการดึงข้อมูล กรุณาลองใหม่.")
+		return
+	}
+	log.Printf("Fetched history records: %+v", historyRecords)
+
+	if len(historyRecords) == 0 {
+		sendReply(bot, event.ReplyToken, "ไม่มีข้อมูลกิจกรรมในช่วงวันที่ที่คุณระบุ")
+		return
+	}
+
+	replyMessage := FormatHistoryofSet(historyRecords, startDate, endDate)
+	log.Printf("Formatted reply message: %s", replyMessage)
+
+	if _, err := bot.ReplyMessage(event.ReplyToken, linebot.NewTextMessage(replyMessage)).Do(); err != nil {
+		log.Println("Error replying message:", err)
+	}
+}
+
 
 func handleSystemManual(bot *linebot.Client, event *linebot.Event, State string) {
 	sendReply(bot, event.ReplyToken, "คุณสามารถดูคู่มือการใช้งานระบบได้ที่ลิงก์: https://example.com/manual")
