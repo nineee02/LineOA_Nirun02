@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-func FormatConfirmationCheckIn(worktimeRecord *models.WorktimeRecord) string {
+func FormatConfirmationCheckIn1(worktimeRecord *models.WorktimeRecord) string {
 	return fmt.Sprintf("--ยืนยันการเช็คอิน--\n\n%s\nรหัสพนักงาน: %s",
 		worktimeRecord.EmployeeInfo.Name,
 		worktimeRecord.EmployeeInfo.EmployeeCode)
@@ -250,8 +250,6 @@ func FormatHistoryofSet(history []*models.Activityrecord, startDate, endDate str
 
 	return result
 }
-
-
 
 // // *************ReplyError*****************************************************************************************
 // func ReplyErrorFormat(bot *linebot.Client, replyToken string) {

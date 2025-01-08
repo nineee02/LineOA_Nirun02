@@ -207,6 +207,7 @@ func GetServiceInfoBycardID(db *sql.DB, cardID string) ([]models.Activityrecord,
 	query := `SELECT a.avtivity_info_id,
 					a.start_time,
 					a.end_time,
+					a.period,
 					p.card_id, 
 					p.username, 
 					p.patient_info_id,
@@ -238,6 +239,7 @@ func GetServiceInfoBycardID(db *sql.DB, cardID string) ([]models.Activityrecord,
 			&record.ActivityRecord_ID,
 			&record.StartTime,
 			&record.EndTime,
+			&record.Period,
 			&patientInfo.CardID,
 			&patientInfo.Name,
 			&patientInfo.PatientInfo_ID,
@@ -304,6 +306,28 @@ func SaveActivityRecord(db *sql.DB, activity *models.Activityrecord) error {
 	}
 
 	return nil
+}
+func GetActivityStartTime(db *sql.DB, cardID string, activity string) (time.Time, error) {
+	// คิวรีเพื่อดึง start_time จาก activity_record โดยใช้ cardID และ activity
+	query := `
+		SELECT a.start_time
+		FROM activity_record a
+		INNER JOIN patient_info p ON a.patient_info_id = p.patient_info_id
+		INNER JOIN service_info s ON a.service_info_id = s.service_info_id
+		WHERE p.card_id = ? AND s.activity = ? AND a.end_time IS NULL
+		LIMIT 1
+	`
+
+	var startTime time.Time
+	err := db.QueryRow(query, cardID, activity).Scan(&startTime)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return time.Time{}, fmt.Errorf("ไม่พบเวลาเริ่มสำหรับ card_id: %s และกิจกรรม: %s", cardID, activity)
+		}
+		return time.Time{}, fmt.Errorf("เกิดข้อผิดพลาดในการดึงเวลาเริ่ม: %v", err)
+	}
+
+	return startTime, nil
 }
 
 func UpdateActivityEndTime(db *sql.DB, activity *models.Activityrecord) error {
