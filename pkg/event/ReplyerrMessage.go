@@ -12,6 +12,11 @@ func FormatConfirmationCheckIn1(worktimeRecord *models.WorktimeRecord) string {
 		worktimeRecord.EmployeeInfo.Name,
 		worktimeRecord.EmployeeInfo.EmployeeCode)
 }
+func FormatConfirmationCheckIn(worktimeRecord *models.WorktimeRecord) string {
+	return fmt.Sprintf("--ยืนยันการเช็คอิน--\n\n%s\nรหัสพนักงาน: %s",
+		worktimeRecord.EmployeeInfo.Name,
+		worktimeRecord.EmployeeInfo.EmployeeCode)
+}
 
 func FormatworktimeCheckin(worktimeRecord *models.WorktimeRecord) string {
 	if worktimeRecord == nil {
