@@ -15,50 +15,62 @@ func intPtr(i int) *int {
 
 func FormatPatientInfo(patient *models.Activityrecord) *linebot.FlexMessage {
 	// สร้าง BubbleContainer
-	
 	container := &linebot.BubbleContainer{
 		Type: linebot.FlexContainerTypeBubble,
 		Size: linebot.FlexBubbleSizeTypeMega,
-		Header: &linebot.BoxComponent{
-			Type:   linebot.FlexComponentTypeBox,
-			Layout: linebot.FlexBoxLayoutTypeVertical,
-			Contents: []linebot.FlexComponent{
-				&linebot.TextComponent{
-					Type:   linebot.FlexComponentTypeText,
-					Text:   "ข้อมูลผู้สูงอายุ",
-					Weight: linebot.FlexTextWeightTypeBold,
-					Size:   linebot.FlexTextSizeTypeXl,
-					Color:  "#FFFFFF",
-					Align:  linebot.FlexComponentAlignTypeCenter,
-				},
-			},
-			BackgroundColor: "#00bcd4",
+		Hero: &linebot.ImageComponent{
+			Type:        linebot.FlexComponentTypeImage,
+			URL:         "https://imgur.com/90bYHjJ.png", // ใส่ URL ของรูปภาพ Gradient ที่คุณต้องการ
+			Size:        linebot.FlexImageSizeTypeFull,
+			AspectRatio: "10:5", // อัตราส่วนภาพ
+			AspectMode:  "cover",
 		},
+		// Header: &linebot.BoxComponent{
+		// 	Type:   linebot.FlexComponentTypeBox,
+		// 	Layout: linebot.FlexBoxLayoutTypeVertical,
+		// 	Contents: []linebot.FlexComponent{
+		// 		&linebot.TextComponent{
+		// 			Type:   linebot.FlexComponentTypeText,
+		// 			Text:   patient.PatientInfo.Name,
+		// 			Weight: linebot.FlexTextWeightTypeBold,
+		// 			Size:   linebot.FlexTextSizeTypeLg,
+		// 			Color:  "#FFFFFF",
+		// 			Align:  linebot.FlexComponentAlignTypeStart,
+		// 		},
+		// 		// บรรทัดที่สอง: ข้อมูลเลขประจำตัวประชาชน
+		// 		&linebot.TextComponent{
+		// 			Type:   linebot.FlexComponentTypeText,
+		// 			Text:   "เลขประจำตัวประชาชน: " + patient.PatientInfo.CardID,
+		// 			Size:   linebot.FlexTextSizeTypeSm,
+		// 			Color:  "#F8F8F8",
+		// 			Margin: linebot.FlexComponentMarginTypeXs,
+		// 			Align:  linebot.FlexComponentAlignTypeStart,
+		// 		},
+		// 	},
+		// 	BackgroundColor: "#08BED7",
+		// },
 		Body: &linebot.BoxComponent{
 			Type:   linebot.FlexComponentTypeBox,
 			Layout: linebot.FlexBoxLayoutTypeVertical,
 			Contents: []linebot.FlexComponent{
-				// ชื่อผู้สูงอายุ
 				&linebot.TextComponent{
 					Type:   linebot.FlexComponentTypeText,
 					Text:   patient.PatientInfo.Name,
 					Weight: linebot.FlexTextWeightTypeBold,
 					Size:   linebot.FlexTextSizeTypeLg,
-					Color:  "#212121",
-					Align:  linebot.FlexComponentAlignTypeCenter,
-					Margin: linebot.FlexComponentMarginTypeXs,
+					Color:  "#000000",
+					Align:  linebot.FlexComponentAlignTypeStart,
 				},
-				// เลขประจำตัวประชาชน
+				// บรรทัดที่สอง: ข้อมูลเลขประจำตัวประชาชน
 				&linebot.TextComponent{
 					Type:   linebot.FlexComponentTypeText,
 					Text:   "เลขประจำตัวประชาชน: " + patient.PatientInfo.CardID,
-					Weight: linebot.FlexTextWeightTypeRegular,
 					Size:   linebot.FlexTextSizeTypeSm,
-					Color:  "#212121",
-					Align:  linebot.FlexComponentAlignTypeCenter,
-					Margin: linebot.FlexComponentMarginTypeSm,
+					Color:  "#555555",
+					Margin: linebot.FlexComponentMarginTypeXs,
+					Align:  linebot.FlexComponentAlignTypeStart,
 				},
-				// ข้อมูลผู้สูงอายุ
+				// ข้อมูลผู้ป่วย
 				createTextRow("อายุ", patient.PatientInfo.Age+" ปี"),
 				createTextRow("เพศ", formatGender(patient.PatientInfo.Sex)),
 				createTextRow("หมู่เลือด", patient.PatientInfo.Blood),
@@ -69,7 +81,8 @@ func FormatPatientInfo(patient *models.Activityrecord) *linebot.FlexMessage {
 					Color:  "#58BDCF",
 					Margin: linebot.FlexComponentMarginTypeXl,
 				},
-				// แสดงสิทธิการรักษา
+				
+				// ข้อมูลสิทธิการรักษา
 				&linebot.BoxComponent{
 					Type:   linebot.FlexComponentTypeBox,
 					Layout: linebot.FlexBoxLayoutTypeVertical,
@@ -91,16 +104,36 @@ func FormatPatientInfo(patient *models.Activityrecord) *linebot.FlexMessage {
 							Wrap:   true, // เปิดตัดข้อความอัตโนมัติ
 							Margin: linebot.FlexComponentMarginTypeSm,
 						},
+						&linebot.SpacerComponent{},
 					},
 				},
 			},
-			BackgroundColor: "#EEECEA7A",
+			BackgroundColor: "#f3fcfd", // สีพื้นหลังสำหรับ Body
+			
 		},
 	}
 
 	// สร้าง FlexMessage
 	return linebot.NewFlexMessage("ข้อมูลผู้สูงอายุ", container)
 }
+
+// &linebot.TextComponent{
+// 	Type:   linebot.FlexComponentTypeText,
+// 	Text:   patient.PatientInfo.Name,
+// 	Weight: linebot.FlexTextWeightTypeBold,
+// 	Size:   linebot.FlexTextSizeTypeLg,
+// 	Color:  "#FFFFFF", // สีขาวสำหรับข้อความ
+// 	Align:  linebot.FlexComponentAlignTypeStart,
+// },
+// // บรรทัดที่สอง: ข้อมูลเลขประจำตัวประชาชน
+// &linebot.TextComponent{
+// 	Type:   linebot.FlexComponentTypeText,
+// 	Text:   "เลขประจำตัวประชาชน: " + patient.PatientInfo.CardID,
+// 	Size:   linebot.FlexTextSizeTypeSm,
+// 	Color:  "#FFFFFF", // สีขาวสำหรับข้อความ
+// 	Margin: linebot.FlexComponentMarginTypeXs,
+// 	Align:  linebot.FlexComponentAlignTypeStart,
+// },
 
 // ฟังก์ชันแปลงเพศ
 func formatGender(sex string) string {
