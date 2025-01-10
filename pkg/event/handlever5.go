@@ -377,11 +377,32 @@ func handleworktimeConfirmCheckOut(bot *linebot.Client, event *linebot.Event, St
 	}
 
 	if strings.ToLower(message) != "เช็คเอ้าท์" {
+		// ดึงข้อมูลพนักงานจาก userState
+		employeeCode := userState[State+"_employeeCode"]
+		db, err := database.ConnectToDB()
+		if err != nil {
+			log.Println("Database connection error:", err)
+			sendReply(bot, event.ReplyToken, "ไม่สามารถเชื่อมต่อฐานข้อมูลได้ กรุณาลองใหม่.")
+			return
+		}
+		defer db.Close()
+
+		worktimeRecord, err := GetWorktime(db, employeeCode)
+		if err != nil || worktimeRecord == nil {
+			log.Println("Error fetching worktime record:", err)
+			sendReply(bot, event.ReplyToken, "ไม่สามารถดึงข้อมูลการทำงานได้ กรุณาลองใหม่.")
+			return
+		}
+
+		// ใช้ FormatConfirmationCheckOut เพื่อฟอร์แมตข้อความ
+		replyMessage := FormatConfirmationCheckOut(worktimeRecord)
+
+		// ส่ง Quick Reply พร้อมข้อความฟอร์แมต
 		quickReply := linebot.NewQuickReplyItems(
 			linebot.NewQuickReplyButton("", linebot.NewMessageAction("เช็คเอ้าท์", "เช็คเอ้าท์")),
 			linebot.NewQuickReplyButton("", linebot.NewMessageAction("ยกเลิก", "ยกเลิก")),
 		)
-		sendReplyWithQuickReply(bot, event.ReplyToken, "กรุณากด 'เช็คเอ้าท์' เพื่อยืนยันการออกงาน.", quickReply)
+		sendReplyWithQuickReply(bot, event.ReplyToken, replyMessage, quickReply)
 		return
 	}
 
@@ -432,6 +453,7 @@ func handleworktimeConfirmCheckOut(bot *linebot.Client, event *linebot.Event, St
 	userState[State] = "wait status worktime"
 	log.Printf("State updated to: %s for user: %s", userState[State], State)
 }
+
 
 func handlePateintInfo(bot *linebot.Client, event *linebot.Event, State string) {
 	if userState[State] != "wait status ElderlyInfoRequest" {
