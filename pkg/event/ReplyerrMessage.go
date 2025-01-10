@@ -7,13 +7,13 @@ import (
 	"time"
 )
 
-func FormatConfirmationCheckIn1(worktimeRecord *models.WorktimeRecord) string {
+func FormatConfirmationCheckIn(worktimeRecord *models.WorktimeRecord) string {
 	return fmt.Sprintf("--ยืนยันการเช็คอิน--\n\n%s\nรหัสพนักงาน: %s",
 		worktimeRecord.EmployeeInfo.Name,
 		worktimeRecord.EmployeeInfo.EmployeeCode)
 }
-func FormatConfirmationCheckIn(worktimeRecord *models.WorktimeRecord) string {
-	return fmt.Sprintf("--ยืนยันการเช็คอิน--\n\n%s\nรหัสพนักงาน: %s",
+func FormatConfirmationCheckInNocheckout(worktimeRecord *models.WorktimeRecord) string {
+	return fmt.Sprintf("%s\nรหัสพนักงาน: %s\nมีการเช็คอินในระบบอยู่แล้ว กรุณาทำการเช็คเอ้าท์ก่อน",
 		worktimeRecord.EmployeeInfo.Name,
 		worktimeRecord.EmployeeInfo.EmployeeCode)
 }
