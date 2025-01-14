@@ -14,16 +14,18 @@ import (
 
 func LineLoginHandler(c *gin.Context) {
 	clientID := "2006767645"
-	redirectURI := "https://eab3-49-237-5-107.ngrok-free.app/callback" // เปลี่ยนลิงก์ให้ตรงกับ ngrok ของคุณ
+	redirectURI := "https://90b9-110-164-198-127.ngrok-free.app/callback"
 	state := "random_string"
 	scope := "profile openid email"
 
+	// สร้าง URL สำหรับ Line Login
 	lineLoginURL := fmt.Sprintf(
 		"https://access.line.me/oauth2/v2.1/authorize?response_type=code&client_id=%s&redirect_uri=%s&state=%s&scope=%s",
 		clientID, redirectURI, state, scope,
 	)
-	log.Println("lineloginURL", lineLoginURL)
+	log.Println("Line Login URL:", lineLoginURL)
 
+	// Redirect ไปยัง URL ที่สร้างขึ้น
 	c.Redirect(http.StatusFound, lineLoginURL)
 }
 
@@ -34,6 +36,7 @@ func LineLoginCallback(c *gin.Context) {
 		return
 	}
 
+	// แลกเปลี่ยน code เป็น access token
 	token, err := exchangeToken(code)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to exchange token"})
@@ -41,37 +44,36 @@ func LineLoginCallback(c *gin.Context) {
 		return
 	}
 
+	// ดึงข้อมูลโปรไฟล์ผู้ใช้
 	profile, err := getProfile(token.AccessToken)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get profile"})
 		log.Printf("Error getting profile: %v", err)
 		return
 	}
-	log.Println("proflie")
 
-	// ตอบกลับด้วยข้อมูลโปรไฟล์
-	c.JSON(http.StatusOK, gin.H{
-		"userID":      profile.UserID,
-		"displayName": profile.DisplayName,
-		"pictureUrl":  profile.PictureURL,
-		"email":       profile.Email,
-	})
+	log.Printf("User Profile: %+v", profile)
+
+	// Redirect ไปยังหน้าการเพิ่มเพื่อนหลังจากขออนุญาตสำเร็จ
+	addFriendURL := "https://line.me/R/ti/p//@392avxhp"
+	c.Redirect(http.StatusFound, addFriendURL)
 }
+
 
 const (
 	clientID     = "2006767645"
 	clientSecret = "68fd27f357fe6cc1c6ea782f1cb9819c"
-	redirectURI  = "https://4fe3-110-164-198-127.ngrok-free.app/callback"
+	redirectURI  = "https://90b9-110-164-198-127.ngrok-free.app/callback"
 	state        = "random_string"
 	scope        = "profile openid email"
-)    
+)
 
 // ฟังก์ชันแลกเปลี่ยน Token
 func exchangeToken(code string) (*models.LineTokenResponse, error) {
 	data := url.Values{
 		"grant_type":    {"authorization_code"},
 		"code":          {code},
-		"redirect_uri":  {"https://4fe3-110-164-198-127.ngrok-free.app/callback"},
+		"redirect_uri":  {"https://90b9-110-164-198-127.ngrok-free.app/callback"},
 		"client_id":     {"2006767645"},
 		"client_secret": {"68fd27f357fe6cc1c6ea782f1cb9819c"},
 	}
@@ -117,4 +119,3 @@ func getProfile(accessToken string) (*models.LineProfile, error) {
 
 	return &profile, nil
 }
-

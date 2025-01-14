@@ -8,26 +8,42 @@ import (
 	"strconv"
 	"time"
 )
+// func GetEmployeeByLINEID(db *sql.DB, lineUserID string) (*models.EmployeeInfo, error) {
+//     query := `
+//         SELECT employee_info_id, employee_code, username, phone_number, email 
+//         FROM employee_info 
+//         WHERE line_user_id = ?`
+//     row := db.QueryRow(query, lineUserID)
+// 	log.Printf("Fetching employee data for LINE User ID: %s", lineUserID)
+//     var employeeInfo models.EmployeeInfo
+//     err := row.Scan(
+//         &employeeInfo.EmployeeInfo_ID,
+//         &employeeInfo.EmployeeCode,
+//         &employeeInfo.Name,
+//         &employeeInfo.PhoneNumber,
+//         &employeeInfo.Email,
+//     )
+//     if err != nil {
+//         return nil, err
+//     }
+//     return &employeeInfo, nil
+// }
 func GetEmployeeByLINEID(db *sql.DB, lineUserID string) (*models.EmployeeInfo, error) {
-    query := `
-        SELECT employee_info_id, employee_code, username, phone_number, email 
-        FROM employee_info 
-        WHERE line_user_id = ?`
-    row := db.QueryRow(query, lineUserID)
-	log.Printf("Fetching employee data for LINE User ID: %s", lineUserID)
-    var employeeInfo models.EmployeeInfo
-    err := row.Scan(
-        &employeeInfo.EmployeeInfo_ID,
-        &employeeInfo.EmployeeCode,
-        &employeeInfo.Name,
-        &employeeInfo.PhoneNumber,
-        &employeeInfo.Email,
-    )
-    if err != nil {
-        return nil, err
-    }
-    return &employeeInfo, nil
+	query := `SELECT employee_info_id, employee_code, username, phone_number, email FROM employee_info WHERE line_user_id = ?`
+	row := db.QueryRow(query, lineUserID)
+
+	employee := &models.EmployeeInfo{}
+	err := row.Scan(&employee.EmployeeInfo_ID, &employee.EmployeeCode, &employee.Name, &employee.PhoneNumber, &employee.Email)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("ไม่พบข้อมูลสำหรับ LINE User ID: %s", lineUserID)
+		}
+		return nil, fmt.Errorf("เกิดข้อผิดพลาดในการดึงข้อมูลพนักงาน: %v", err)
+	}
+
+	return employee, nil
 }
+
 
 func GetEmployeeInfo(db *sql.DB, employeeCode string) (*models.EmployeeInfo, error) {
 	query := `

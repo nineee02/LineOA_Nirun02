@@ -1,41 +1,38 @@
 package main
 
 import (
-	"fmt"
-	"log"
-	"nirun/pkg/database" // ถ้าฟังก์ชัน HandleLineWebhook อยู่ใน pkg/hook
+	"log" // ถ้าฟังก์ชัน HandleLineWebhook อยู่ใน pkg/hook
 	"nirun/pkg/event"
 	"nirun/pkg/hook"
 	"nirun/pkg/linebot"
 
 	"github.com/gin-gonic/gin"
+	"github.com/skip2/go-qrcode"
 )
 
+func generateQRCode() {
+	url := "https://access.line.me/oauth2/v2.1/authorize?response_type=code&client_id=2006767645&redirect_uri=https://90b9-110-164-198-127.ngrok-free.app/callback&state=random_string&scope=profile%20openid%20email"
+	err := qrcode.WriteFile(url, qrcode.Medium, 256, "qrcode_line_login.png")
+	if err != nil {
+		log.Fatalf("Failed to generate QR Code: %v", err)
+	}
+	log.Println("QR Code generated successfully.")
+}
+
 func main() {
-	// เรียกใช้ InitLineBot เพื่อสร้าง instance ของ LINE Bot
+	// สร้าง QR Code สำหรับ URL
+	generateQRCode()
+
+	// รันเซิร์ฟเวอร์ของ LINE Bot
+	// (โค้ดที่เหลือของคุณสำหรับการตั้งค่า Gin และเซิร์ฟเวอร์)
 	linebot.InitLineBot()
 
 	router := gin.Default()
 
 	router.POST("/webhook", hook.HandleLineWebhook)
-
-	// เส้นทางสำหรับ LINE Login
 	router.GET("/login", event.LineLoginHandler)
 
-	// เส้นทางสำหรับ Callback
 	router.GET("/callback", event.LineLoginCallback)
 
-	// รันเซิร์ฟเวอร์ที่พอร์ต 8080
-	router.Run(":8080")
-	// เชื่อมต่อฐานข้อมูล
-	db, err := database.ConnectToDB()
-	if err != nil {
-		log.Fatalf("Could not connect to database: %v", err)
-	}
-	defer db.Close()
-
-	fmt.Println("Connected to database successfully!")
-
-	// รันเซิร์ฟเวอร์ที่พอร์ต 8080
 	router.Run(":8080")
 }
