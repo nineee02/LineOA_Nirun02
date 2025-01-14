@@ -97,6 +97,7 @@ type ActivitySetDetail struct {
 type EmployeeInfo struct {
 	EmployeeInfo_ID int             `json:"employee_info_id"`
 	EmployeeCode    string          `json:"employee_code"`
+	Line_user_id    string          `json:"line_user_id"`
 	Name            string          `json:"username"`
 	PhoneNumber     string          `json:"phone_number"`
 	Email           string          `json:"email"`
@@ -127,4 +128,19 @@ type WorktimeRecord struct {
 	WriteDate         string       `json:"write_date"`
 	EmployeeInfo_ID   int          `json:"employee_info_id"`
 	EmployeeInfo      EmployeeInfo `json:"employee_info"`
+}
+
+type LineTokenResponse struct {
+	AccessToken  string `json:"access_token"`
+	IDToken      string `json:"id_token"`
+	ExpiresIn    int    `json:"expires_in"`
+	TokenType    string `json:"token_type"`
+	RefreshToken string `json:"refresh_token"`
+}
+
+type LineProfile struct {
+	UserID      string `json:"userId"`
+	DisplayName string `json:"displayName"`
+	PictureURL  string `json:"pictureUrl"`
+	Email       string `json:"email"`
 }

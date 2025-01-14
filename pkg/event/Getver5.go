@@ -8,6 +8,26 @@ import (
 	"strconv"
 	"time"
 )
+func GetEmployeeByLINEID(db *sql.DB, lineUserID string) (*models.EmployeeInfo, error) {
+    query := `
+        SELECT employee_info_id, employee_code, username, phone_number, email 
+        FROM employee_info 
+        WHERE line_user_id = ?`
+    row := db.QueryRow(query, lineUserID)
+	log.Printf("Fetching employee data for LINE User ID: %s", lineUserID)
+    var employeeInfo models.EmployeeInfo
+    err := row.Scan(
+        &employeeInfo.EmployeeInfo_ID,
+        &employeeInfo.EmployeeCode,
+        &employeeInfo.Name,
+        &employeeInfo.PhoneNumber,
+        &employeeInfo.Email,
+    )
+    if err != nil {
+        return nil, err
+    }
+    return &employeeInfo, nil
+}
 
 func GetEmployeeInfo(db *sql.DB, employeeCode string) (*models.EmployeeInfo, error) {
 	query := `
@@ -606,136 +626,3 @@ func historyOfSet(db *sql.DB, startDate, endDate string) ([]*models.Activityreco
 	return results, nil
 }
 
-// func ServiceHistory(db *sql.DB,history *models.Activityrecord) ([]models.Activityrecord, error) {
-// 	query := `SELECT a.avtivity_info_id,
-// 					a.start_time,
-// 					a.end_time,
-// 					p.card_id,
-// 					p.username,
-// 					p.patient_info_id,
-// 					s.service_info_id,
-// 					s.activity
-// 					e.employee_info_id
-
-// 			  FROM activity_record a
-// 			  INNER JOIN patient_info p ON a.patient_info_id = p.patient_info_id
-// 			  INNER JOIN service_info s ON a.service_info_id = s.service_info_id
-// 			  INNER JOIN employee_info e ON a.employee_info_id = e.employee_info_id
-// 			  WHERE p.card_id =?`
-
-// 	rows, err := db.Query(query, history.PatientInfo.CardID)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	defer rows.Close()
-
-// 	var activityrecord []models.Activityrecord
-
-// 	for rows.Next() {
-// 		var record models.Activityrecord
-// 		var patientInfo models.PatientInfo
-// 		var serviceInfo models.ServiceInfo
-// 		var employeeInfo models.EmployeeInfo
-
-// 		err := rows.Scan(
-// 			&record.ActivityRecord_ID,
-// 			&record.StartTime,
-// 			&record.EndTime,
-// 			&patientInfo.CardID,
-// 			&patientInfo.Name,
-// 			&patientInfo.PatientInfo_ID,
-// 			&serviceInfo.ServiceInfo_ID,
-// 			&serviceInfo.Activity,
-// 			&employeeInfo.EmployeeInfo_ID)
-// 		if err != nil {
-// 			return nil, err
-// 		}
-// 		// Assign ข้อมูลให้กับ Activityrecord
-// 		record.PatientInfo = patientInfo
-// 		record.ServiceInfo = serviceInfo
-// 		record.EmployeeInfo = employeeInfo
-
-// 		activityrecord = append(activityrecord, record)
-// 	}
-
-// 	if len(activityrecord) == 0 {
-// 		return nil, fmt.Errorf("ไม่พบข้อมูลกิจกรรม: %s", history.PatientInfo.CardID)
-// 	}
-
-// 	return activityrecord, nil
-// }
-
-// **********************************************************************************************************************
-// FormatPatientInfo จัดรูปแบบข้อมูลผู้ป่วยให้อยู่ในรูปแบบข้อความที่เหมาะสมสำหรับการแสดงผลหรือส่งกลับไปยังผู้ใช้
-// func FormatPatientInfo(patient *models.PatientInfo) string {
-// 	return fmt.Sprintf("ข้อมูลผู้ป่วย:\nชื่อ: %s\nรหัสผู้ป่วย: %s\nอายุ: %d\nเพศ: %s\nหมู่เลือด: %s\nหมายเลขโทรศัพท์: %s",
-// 		patient.Name, patient.PatientID, patient.Age, patient.Sex, patient.Blood, patient.PhoneNumber)
-// }
-
-// // formatServiceInfo จัดรูปแบบข้อมูลกิจกรรมของผู้สูงอายุให้เหมาะสมสำหรับการแสดงผล
-// func FormatServiceInfo(activity []models.PatientInfo) string {
-// 	// สร้างข้อความสำหรับชื่อผู้ป่วยและกิจกรรมที่สำเร็จแล้ว
-// 	message := fmt.Sprintf("ชื่อผู้ป่วย: %s\nกิจกรรมที่สำเร็จแล้ว:\n", activity[0].Name)
-// 	for _, info := range activity {
-// 		message += fmt.Sprintf("- %s\n", info.Activityrecord)
-// 	}
-
-// 	// เพิ่มรายการกิจกรรมที่สามารถเลือกเพิ่มได้
-// 	activities := []string{
-// 		"แช่เท้า", "นวด/ประคบ", "ฝังเข็ม", "คาราโอเกะ", "ครอบแก้ว",
-// 		"ทำอาหาร", "นั่งสมาธิ", "เล่าสู่กัน", "ซุโดกุ", "จับคู่ภาพ",
-// 	}
-// 	message += "\nเลือกกิจกรรมที่คุณต้องการเพิ่ม:\n"
-// 	for _, activity := range activities {
-// 		message += fmt.Sprintf("- %s\n", activity)
-// 		for _, activity := range activities {
-// 			message += fmt.Sprintf("- %s\n", activity)
-// 		}
-// 		return message
-// 	}
-// 	return message
-// }
-
-// ******************************************************************************************************************************************
-// replyErrorFormat ส่งข้อความตัวอย่างการใช้งานที่ถูกต้องกลับไปยังผู้ใช้ เมื่อรูปแบบคำสั่งที่ได้รับไม่ถูกต้อง
-// func ReplyErrorFormat(bot *linebot.Client, replyToken string) {
-// 	if _, err := bot.PushMessage(
-// 		replyToken,
-// 		linebot.NewTextMessage("กรุณากรอกรูปแบบข้อความให้ถูกต้อง เช่น 'นางสมหวัง สดใส'"),
-// 		//linebot.NewTextMessage("กรุณากรอกรูปแบบ 'ข้อมูลผู้กิจกรรม []'"),
-// 	).Do(); err != nil {
-// 		log.Println("เกิดข้อผิดพลาดในการส่งข้อความ:", err)
-// 	}
-// }
-
-// // ฟังก์ชัน replyDataNotFound แจ้งผู้ใช้เมื่อไม่พบข้อมูลผู้สูงอายุ
-// func ReplyDataNotFound(bot *linebot.Client, replyToken string) {
-// 	notFoundMessage := "ไม่พบข้อมูลผู้สูงอายุตามชื่อ กรุณาลองใหม่อีกครั้ง"
-// 	if _, err := bot.PushMessage(replyToken, linebot.NewTextMessage(notFoundMessage)).Do(); err != nil {
-// 		log.Println("Error sending not found message:", err)
-// 	}
-// }
-
-// ฟังก์ชัน replyDatabaseError ข้อผิดพลาดในการเชื่อมต่อฐานข้อมูล
-// func ReplyDatabaseError(bot *linebot.Client, replyToken string) {
-// 	dbErrorMessage := "เกิดข้อผิดพลาดในการเชื่อมต่อฐานข้อมูล กรุณาลองใหม่อีกครั้งภายหลัง"
-// 	if _, err := bot.ReplyMessage(replyToken, linebot.NewTextMessage(dbErrorMessage)).Do(); err != nil {
-// 		log.Println("Error sending database error message:", err)
-// 	}
-// }
-
-// // func GetEmployee(db *sql.DB, NameEmployee string) (*Employee, error) {
-// // 	query := "INSERT INTO employee (username, start_time) VALUES (?, ?)"
-// // 	startTime := time.Now().Format("2006-01-02 15:04:05")
-
-// // 	log.Printf("Executing query: %s, Values: %s, %s", query, NameEmployee, startTime)
-
-// // 	_, err := db.Exec(query, NameEmployee, startTime_ServiceInfo)
-// // 	if err != nil {
-// // 		return nil, fmt.Errorf("ไม่สามารถบันทึกเวลาเข้างานได้: %v", err)
-// // 	}
-
-// // 	return &Employee{Name: NameEmployee, Starttime_ServiceInfo: startTime}, nil
-// // }
-
-// // **********************************************************************************************************************
