@@ -116,7 +116,6 @@ func handleServiceHistoryStste(bot *linebot.Client, event *linebot.Event, State 
 	setUserState(State, "wait status HistoryRequest")
 }
 
-
 // ************************************************************************************************************************
 
 // **********************************************************************************************************
@@ -472,7 +471,7 @@ func handleServiceInfo(bot *linebot.Client, event *linebot.Event, State string) 
 		return
 	}
 
-	// หากผู้ใช้ส่งข้อความ "บันทึกการเข้ารับบริการ"
+	// หากผู้ใช้ส่งข้อความ "บันทึกกิจกรรม"
 	if strings.TrimSpace(message) == "บันทึกกิจกรรม" {
 		sendReply(bot, event.ReplyToken, "กรุณากรอกเลขบัตรประชาชน 13หลักของผู้เข้ารับบริการ\nตัวอย่างเช่น 1234567891234 :")
 		return
@@ -616,7 +615,7 @@ func handleActivityStart(bot *linebot.Client, event *linebot.Event, State string
 
 	// ถ้ายังไม่ได้เช็คอิน
 	if !checkedIn {
-		sendReply(bot, event.ReplyToken, "กรุณาเช็คอินก่อน\nที่เมนู 'ลงเวลาเข้าและออกงาน'")
+		sendReply(bot, event.ReplyToken, "กรุณาเช็คอินก่อน\nที่เมนู 'ลงเวลางาน'")
 		return
 	}
 
@@ -771,7 +770,7 @@ func handleSaveavtivityend(bot *linebot.Client, event *linebot.Event, userID str
 
 	// บันทึกข้อมูลใน activity_record
 	activityRecord := &models.Activityrecord{
-		ActivityRecord_ID: activityRecordID, 
+		ActivityRecord_ID: activityRecordID,
 		PatientInfo: models.PatientInfo{
 			CardID:         cardID,
 			Name:           patient.PatientInfo.Name,
@@ -782,7 +781,7 @@ func handleSaveavtivityend(bot *linebot.Client, event *linebot.Event, userID str
 		},
 		EndTime:      time.Now(),
 		EmployeeInfo: models.EmployeeInfo{EmployeeInfo_ID: employeeID},
-		UserInfo:     models.User_info{UserInfo_ID: userInfo.UserInfo_ID}, 
+		UserInfo:     models.User_info{UserInfo_ID: userInfo.UserInfo_ID},
 	}
 
 	// บันทึกข้อมูลในฐานข้อมูล
@@ -799,7 +798,6 @@ func handleSaveavtivityend(bot *linebot.Client, event *linebot.Event, userID str
 	log.Printf("บันทึกกิจกรรมสำเร็จ: %s", replyMessage)
 	resetUserState(userID)
 }
-
 
 func createQuickReplyActivities() linebot.QuickReplyItems {
 	activities := []string{
