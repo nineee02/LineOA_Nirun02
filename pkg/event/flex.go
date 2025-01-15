@@ -8,7 +8,7 @@ import (
 
 func sendRegisterLink(bot *linebot.Client, replyToken string) {
 	// URL สำหรับลงทะเบียน
-	registerURL := "https://access.line.me/oauth2/v2.1/authorize?response_type=code&client_id=2006767645&redirect_uri=https://4fe3-110-164-198-127.ngrok-free.app/callback&state=random_string&scope=profile%20openid%20email"
+	registerURL := "https://access.line.me/oauth2/v2.1/authorize?response_type=code&client_id=2006767645&redirect_uri=https://7761-110-164-198-113.ngrok-free.app/callback&state=random_string&scope=profile%20openid%20email"
 
 	// สร้าง Flex Message
 	flexContainer := &linebot.BubbleContainer{

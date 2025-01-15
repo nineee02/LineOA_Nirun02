@@ -19,6 +19,8 @@ type PatientInfo struct {
 	Religion             Religion             `json:"religion_info"`
 	CountryInfo          CountryInfo          `json:"country_info"`
 	RightToTreatmentInfo RightToTreatmentInfo `json:"reght_to_treatment_info"`
+	Create_by            string               `json:"create_by"`
+	Write_by             string               `json:"write_by"`
 }
 
 type CountryInfo struct {
@@ -26,6 +28,8 @@ type CountryInfo struct {
 	Country        string `json:"country"`
 	CreateDate     string `json:"create_date"`
 	WriteDate      string `json:"write_date"`
+	Create_by      string `json:"create_by"`
+	Write_by       string `json:"write_by"`
 }
 
 type Religion struct {
@@ -33,6 +37,8 @@ type Religion struct {
 	Religion        string `json:"religion"`
 	CreateDate      string `json:"create_date"`
 	WriteDate       string `json:"write_date"`
+	Create_by       string `json:"create_by"`
+	Write_by        string `json:"write_by"`
 }
 
 type RightToTreatmentInfo struct {
@@ -40,6 +46,8 @@ type RightToTreatmentInfo struct {
 	Right_to_treatment      string `json:"right_to_treatment"`
 	CreateDate              string `json:"create_date"`
 	WriteDate               string `json:"write_date"`
+	Create_by               string `json:"create_by"`
+	Write_by                string `json:"write_by"`
 }
 
 type ServiceInfo struct {
@@ -48,56 +56,32 @@ type ServiceInfo struct {
 	ServiceType    string `json:"service_type"`
 	CreateDate     string `json:"create_date"`
 	WriteDate      string `json:"write_date"`
+	Create_by      string `json:"create_by"`
+	Write_by       string `json:"write_by"`
 }
 
 type Activityrecord struct {
-	ActivityRecord_ID   int                 `json:"activity_record_id"`
-	StartTime           time.Time           `json:"start_time"`
-	EndTime             time.Time           `json:"end_time"`
-	Period              string              `json:"period"`
-	Evidence_activity   []byte              `json:"evidence_activity"`
-	Evidence_time       []byte              `json:"evidence_time"`
-	Location            string              `json:"location"`
-	CreateDate          string              `json:"create_date"`
-	WriteDate           string              `json:"write_date"`
-	PatientInfo         PatientInfo         `json:"patient_info"`
-	ServiceInfo         ServiceInfo         `json:"service_info"`
-	EmployeeInfo        EmployeeInfo        `json:"employee_info"`
-	ActivityYearDetail  ActivityYearDetail  `json:"activity_year_detail"`
-	ActivityMonthDetail ActivityMonthDetail `json:"activity_month_detail"`
-	ActivityWeekDetail  ActivityWeekDetail  `json:"activity_week_detail"`
-	ActivityDayDetail   ActivityDayDetail   `json:"activity_day_detail"`
-	ActivitySetDetail   ActivitySetDetail   `json:"activity_set_detail"`
-}
-type ActivityYearDetail struct {
-	Year         int    `json:"year"`
-	ActivityType string `json:"activity_type"`
-	Total        int    `json:"total"`
-}
-type ActivityMonthDetail struct {
-	Month        int    `json:"month"`
-	ActivityType string `json:"activity_type"`
-	Total        int    `json:"total"`
-}
-type ActivityWeekDetail struct {
-	Week         int    `json:"week"`
-	ActivityType string `json:"activity_type"`
-	Total        int    `json:"total"`
-}
-type ActivityDayDetail struct {
-	Day          int    `json:"day"`
-	ActivityType string `json:"activity_type"`
-	Total        int    `json:"total"`
-}
-type ActivitySetDetail struct {
-	Date         int    `json:"date"`
-	ActivityType string `json:"activity_type"`
-	Total        int    `json:"total"`
+	ActivityRecord_ID int          `json:"activity_record_id"`
+	StartTime         time.Time    `json:"start_time"`
+	EndTime           time.Time    `json:"end_time"`
+	Period            string       `json:"period"`
+	Evidence_activity []byte       `json:"evidence_activity"`
+	Evidence_time     []byte       `json:"evidence_time"`
+	CreateDate        string       `json:"create_date"`
+	WriteDate         string       `json:"write_date"`
+	PatientInfo       PatientInfo  `json:"patient_info"`
+	ServiceInfo       ServiceInfo  `json:"service_info"`
+	EmployeeInfo      EmployeeInfo `json:"employee_info"`
+	UserInfo          User_info    `json:"user_info"`
+	Create_by         string       `json:"create_by"`
+	Write_by          string       `json:"write_by"`
+
+	// Location            string              `json:"location"`
 }
 type EmployeeInfo struct {
 	EmployeeInfo_ID int             `json:"employee_info_id"`
 	EmployeeCode    string          `json:"employee_code"`
-	Line_user_id    string          `json:"line_user_id"`
+	Sex             string          `json:"sex"`
 	Name            string          `json:"username"`
 	PhoneNumber     string          `json:"phone_number"`
 	Email           string          `json:"email"`
@@ -105,18 +89,24 @@ type EmployeeInfo struct {
 	WriteDate       string          `json:"write_date"`
 	DepartmentInfo  DepartmentInfo  `json:"department_inf"`
 	JobPositionInfo JobPositionInfo `json:"job_position_info"`
+	Create_by       string          `json:"create_by"`
+	Write_by        string          `json:"write_by"`
 }
 type DepartmentInfo struct {
 	DepartmentInfo_id int    `json:"department_info_id"`
 	Department        string `json:"department"`
 	CreateDate        string `json:"create_date"`
 	WriteDate         string `json:"write_date"`
+	Create_by         string `json:"create_by"`
+	Write_by          string `json:"write_by"`
 }
 type JobPositionInfo struct {
 	JobPositionInfo_id int    `json:"job_position_info_id"`
 	JobPosition        string `json:"job_position"`
 	CreateDate         string `json:"create_date"`
 	WriteDate          string `json:"write_date"`
+	Create_by          string `json:"create_by"`
+	Write_by           string `json:"write_by"`
 }
 
 type WorktimeRecord struct {
@@ -128,6 +118,23 @@ type WorktimeRecord struct {
 	WriteDate         string       `json:"write_date"`
 	EmployeeInfo_ID   int          `json:"employee_info_id"`
 	EmployeeInfo      EmployeeInfo `json:"employee_info"`
+	UserInfo          User_info    `json:"user_info"`
+	Create_by         string       `json:"create_by"`
+	Write_by          string       `json:"write_by"`
+}
+type User_info struct {
+	UserInfo_ID  int          `json:"user_info_id"`
+	Line_user_id string       `json:"line_user_id"`
+	Sex          string       `json:"sex"`
+	Name         string       `json:"user_name"`
+	Email        string       `json:"email"`
+	PhoneNumber  string       `json:"phone_number"`
+	CreateDate   string       `json:"create_date"`
+	WriteDate    string       `json:"write_date"`
+	EmployeeInfo EmployeeInfo `json:"employee_info"`
+	Create_by    string       `json:"create_by"`
+	Write_by     string       `json:"write_by"`
+	
 }
 
 type LineTokenResponse struct {

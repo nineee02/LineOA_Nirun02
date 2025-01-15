@@ -11,7 +11,7 @@ import (
 )
 
 func generateQRCode() {
-	url := "https://access.line.me/oauth2/v2.1/authorize?response_type=code&client_id=2006767645&redirect_uri=https://90b9-110-164-198-127.ngrok-free.app/callback&state=random_string&scope=profile%20openid%20email"
+	url := "https://access.line.me/oauth2/v2.1/authorize?response_type=code&client_id=2006767645&redirect_uri=https://7761-110-164-198-113.ngrok-free.app/callback&state=random_string&scope=profile%20openid%20email"
 	err := qrcode.WriteFile(url, qrcode.Medium, 256, "qrcode_line_login.png")
 	if err != nil {
 		log.Fatalf("Failed to generate QR Code: %v", err)

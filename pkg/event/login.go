@@ -14,7 +14,7 @@ import (
 
 func LineLoginHandler(c *gin.Context) {
 	clientID := "2006767645"
-	redirectURI := "https://90b9-110-164-198-127.ngrok-free.app/callback"
+	redirectURI := "https://7761-110-164-198-113.ngrok-free.app/callback"
 	state := "random_string"
 	scope := "profile openid email"
 
@@ -54,16 +54,23 @@ func LineLoginCallback(c *gin.Context) {
 
 	log.Printf("User Profile: %+v", profile)
 
-	// Redirect ไปยังหน้าการเพิ่มเพื่อนหลังจากขออนุญาตสำเร็จ
+	// บันทึกข้อมูลผู้ใช้ลงในฐานข้อมูล
+	// err = saveUserToDatabase(profile.UserID, profile.DisplayName, profile.Email)
+	// if err != nil {
+	//     c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save user"})
+	//     log.Printf("Error saving user to database: %v", err)
+	//     return
+	// }
+
+	// Redirect ไปยังหน้าการเพิ่มเพื่อนหลังจากบันทึกสำเร็จ
 	addFriendURL := "https://line.me/R/ti/p//@392avxhp"
 	c.Redirect(http.StatusFound, addFriendURL)
 }
 
-
 const (
 	clientID     = "2006767645"
 	clientSecret = "68fd27f357fe6cc1c6ea782f1cb9819c"
-	redirectURI  = "https://90b9-110-164-198-127.ngrok-free.app/callback"
+	redirectURI  = "https://7761-110-164-198-113.ngrok-free.app/callback"
 	state        = "random_string"
 	scope        = "profile openid email"
 )
@@ -73,7 +80,7 @@ func exchangeToken(code string) (*models.LineTokenResponse, error) {
 	data := url.Values{
 		"grant_type":    {"authorization_code"},
 		"code":          {code},
-		"redirect_uri":  {"https://90b9-110-164-198-127.ngrok-free.app/callback"},
+		"redirect_uri":  {"https://7761-110-164-198-113.ngrok-free.app/callback"},
 		"client_id":     {"2006767645"},
 		"client_secret": {"68fd27f357fe6cc1c6ea782f1cb9819c"},
 	}

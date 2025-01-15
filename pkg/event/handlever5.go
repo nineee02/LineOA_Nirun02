@@ -6,15 +6,11 @@ import (
 	"log"
 	"nirun/pkg/database"
 	"nirun/pkg/models"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/line/line-bot-sdk-go/linebot"
 )
-
-
-
 
 var usercardidState = make(map[string]string)
 var userState = make(map[string]string)
@@ -70,20 +66,8 @@ func HandleEvent(bot *linebot.Client, event *linebot.Event) {
 			handleActivityStart(bot, event, State)
 		case "wait status ActivityEnd":
 			handleActivityEnd(bot, event, State)
-		case "wait status HistoryRequest":
-			handleServiceHistory(bot, event, State)
-		case "wait status HistoryAll":
-			handleActivityHistoryAll(bot, event, State)
-		case "wait status HistoryofYear":
-			handleActivityHistoryofYear(bot, event, State)
-		case "wait status HistoryofMonth":
-			handleActivityHistoryofMonth(bot, event, State)
-		case "wait status HistoryofWeek":
-			handleActivityHistoryofWeek(bot, event, State)
-		case "wait status HistoryofDay":
-			handleActivityHistoryofDay(bot, event, State)
-		case "wait status HistoryofSet":
-			handleActivityHistoryofSet(bot, event, State)
+		case "wait status Saveavtivityend":
+			handleSaveavtivityend(bot, event, State)
 		default:
 			log.Printf("Unhandled state for user %s: %s", State, State)
 		}
@@ -107,10 +91,26 @@ func handleNirunStste(bot *linebot.Client, event *linebot.Event, State string) {
 }
 
 func handleElderlyInfoStste(bot *linebot.Client, event *linebot.Event, State string) {
+	userID := event.Source.UserID
+
+	// ตรวจสอบสถานะการเช็คอินของบัญชี LINE
+	if isUserCheckedIn(userID) {
+		sendReply(bot, event.ReplyToken, "คุณได้เช็คอินอยู่แล้ว กรุณาเช็คเอาท์ก่อนทำการเช็คอินใหม่")
+		return
+	}
+
+	// อนุญาตให้ดำเนินการ
 	setUserState(State, "wait status ElderlyInfoRequest")
 }
 
 func handleServiceRecordStste(bot *linebot.Client, event *linebot.Event, State string) {
+	userID := event.Source.UserID
+
+	// ตรวจสอบสถานะการเช็คอินของบัญชี LINE
+	if isUserCheckedIn(userID) {
+		sendReply(bot, event.ReplyToken, "คุณได้เช็คอินอยู่แล้ว กรุณาเช็คเอาท์ก่อนทำการเช็คอินใหม่")
+		return
+	}
 	setUserState(State, "wait status ServiceRecordRequest")
 }
 
@@ -171,6 +171,7 @@ func sendCustomReply(bot *linebot.Client, replyToken string, userID string, gree
 func sendQRCodeForLogin(bot *linebot.Client, replyToken string) {
 	sendRegisterLink(bot, replyToken)
 }
+
 // ตรวจสอบสถานะการเช็คอินของบัญชี
 func isUserCheckedIn(userID string) bool {
 	status, exists := userCheckInStatus[userID]
@@ -198,79 +199,65 @@ func unlockEmployeeLogin(employeeID string) {
 }
 
 func handleWorktime(bot *linebot.Client, event *linebot.Event, userID string) {
-    // ตรวจสอบสถานะการลงทะเบียน
-    if !isUserRegistered(userID) {
-        sendQRCodeForLogin(bot, event.ReplyToken) // ส่ง QR Code สำหรับลงทะเบียน
-        return
-    }
+	db, err := database.ConnectToDB()
+	if err != nil {
+		log.Println("Database connection error:", err)
+		sendReply(bot, event.ReplyToken, "ไม่สามารถเชื่อมต่อฐานข้อมูลได้ กรุณาลองใหม่.")
+		return
+	}
+	defer db.Close()
 
-    db, err := database.ConnectToDB()
-    if err != nil {
-        log.Println("Database connection error:", err)
-        sendReply(bot, event.ReplyToken, "ไม่สามารถเชื่อมต่อฐานข้อมูลได้ กรุณาลองใหม่.")
-        return
-    }
-    defer db.Close()
+	// ดึงข้อมูลผู้ใช้ที่เชื่อมโยงกับ LINE UserID
+	userInfo, err := GetUserInfoByLINEID(db, userID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			sendReply(bot, event.ReplyToken, "ไม่พบข้อมูลผู้ใช้ที่เชื่อมโยงกับบัญชี LINE นี้.")
+		} else {
+			log.Println("Error fetching user info:", err)
+			sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาด กรุณาลองใหม่.")
+		}
+		return
+	}
 
-    // ดึงข้อมูลพนักงานที่เชื่อมโยงกับ LINE UserID
-    employeeInfo, err := GetEmployeeByLINEID(db, userID)
-    if err != nil {
-        if err == sql.ErrNoRows {
-            sendReply(bot, event.ReplyToken, "ไม่พบข้อมูลพนักงานที่เชื่อมโยงกับบัญชี LINE นี้.")
-        } else {
-            log.Println("Error fetching employee info:", err)
-            sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาด กรุณาลองใหม่.")
-        }
-        return
-    }
+	// ตรวจสอบสถานะการเข้างาน (Check-In)
+	checkedIn, err := IsEmployeeCheckedIn(db, userInfo.UserInfo_ID)
+	if err != nil {
+		log.Println("Error checking user status:", err)
+		sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการตรวจสอบสถานะ กรุณาลองใหม่.")
+		return
+	}
 
-    // ตรวจสอบสถานะเช็คอิน
-    checkedIn, err := IsEmployeeCheckedIn(db, employeeInfo.EmployeeInfo_ID)
-    if err != nil {
-        log.Println("Error checking employee status:", err)
-        sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการตรวจสอบสถานะ กรุณาลองใหม่.")
-        return
-    }
+	// ตรวจสอบข้อความที่ส่งมา
+	message := strings.TrimSpace(event.Message.(*linebot.TextMessage).Text)
 
-    // ตรวจสอบข้อความที่ส่งมา
-    message := strings.TrimSpace(event.Message.(*linebot.TextMessage).Text)
+	switch message {
+	case "เช็คอิน":
+		if checkedIn {
+			sendReply(bot, event.ReplyToken, "คุณได้เช็คอินอยู่แล้ว กรุณาเช็คเอาท์ก่อนทำการเช็คอินใหม่.")
+			return
+		}
+		userState[userID] = "wait status worktimeConfirmCheckIn"
+		handleworktimeConfirmCheckIn(bot, event, userID)
 
-    switch message {
-    case "เช็คอิน":
-        if checkedIn {
-            sendReply(bot, event.ReplyToken, "คุณได้เช็คอินอยู่แล้ว กรุณาเช็คเอาท์ก่อนทำการเช็คอินใหม่")
-            return
-        }
-        userState[userID] = "wait status worktimeConfirmCheckIn"
-        handleworktimeConfirmCheckIn(bot, event, userID)
+	case "เช็คเอ้าท์":
+		if !checkedIn {
+			sendReply(bot, event.ReplyToken, "คุณยังไม่ได้เช็คอิน กรุณาเช็คอินก่อนทำการเช็คเอาท์.")
+			return
+		}
+		userState[userID] = "wait status worktimeConfirmCheckOut"
+		handleworktimeConfirmCheckOut(bot, event, userID)
 
-    case "เช็คเอ้าท์":
-        if !checkedIn {
-            sendReply(bot, event.ReplyToken, "คุณยังไม่ได้เช็คอิน กรุณาเช็คอินก่อน")
-            return
-        }
-        userState[userID] = "wait status worktimeConfirmCheckOut"
-        handleworktimeConfirmCheckOut(bot, event, userID)
-
-        var quickReply *linebot.QuickReplyItems
-
-        sendReply(bot, event.ReplyToken, "กรุณาเลือก 'เช็คอิน' หรือ 'เช็คเอ้าท์'")
-        quickReply = linebot.NewQuickReplyItems(
-            linebot.NewQuickReplyButton("", linebot.NewMessageAction("เช็คอิน", "เช็คอิน")),
-            linebot.NewQuickReplyButton("", linebot.NewMessageAction("เช็คเอ้าท์", "เช็คเอ้าท์")),
-        )
-
-        sendReplyWithQuickReply(bot, event.ReplyToken, "กรุณาเลือกตัวเลือก:", quickReply)
-    }
+	default:
+		sendReply(bot, event.ReplyToken, "กรุณาเลือก 'เช็คอิน' หรือ 'เช็คเอ้าท์'")
+	}
 }
 
 // ฟังก์ชันตรวจสอบสถานะการลงทะเบียน
 func isUserRegistered(userID string) bool {
-    // ตรวจสอบจากสถานะใน userState หรือฐานข้อมูล
-    state, exists := userState[userID]
-    return exists && state == "registered"
+	// ตรวจสอบจากสถานะใน userState หรือฐานข้อมูล
+	state, exists := userState[userID]
+	return exists && state == "registered"
 }
-
 
 func handleworktimeConfirmCheckIn(bot *linebot.Client, event *linebot.Event, userID string) {
 	if userState[userID] != "wait status worktimeConfirmCheckIn" {
@@ -287,25 +274,42 @@ func handleworktimeConfirmCheckIn(bot *linebot.Client, event *linebot.Event, use
 	}
 	defer db.Close()
 
-	// ดึงข้อมูล employee_info_id จาก LINE User ID
-	employeeInfo, err := GetEmployeeByLINEID(db, userID)
+	// ดึงข้อมูลผู้ใช้จาก LINE User ID
+	userInfo, err := GetUserInfoByLINEID(db, userID)
 	if err != nil {
-		sendReply(bot, event.ReplyToken, "ไม่พบข้อมูลพนักงาน กรุณาลองใหม่.")
+		sendReply(bot, event.ReplyToken, "ไม่พบข้อมูลผู้ใช้ กรุณาลองใหม่.")
 		return
 	}
 
-	// บันทึกการเช็คอิน
-	err = RecordCheckIn(db, employeeInfo.EmployeeInfo_ID)
+	// ตรวจสอบสถานะการเช็คอิน/เช็คเอ้าท์
+	checkedIn, err := IsEmployeeCheckedIn(db, userInfo.UserInfo_ID)
 	if err != nil {
-		log.Println("Error recording Check-in:", err)
+		log.Println("Error checking check-in status:", err)
+		sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการตรวจสอบสถานะ กรุณาลองใหม่.")
+		return
+	}
+
+	// หากยังไม่ได้เช็คเอ้าท์
+	if checkedIn {
+		sendReply(bot, event.ReplyToken, "คุณได้เช็คอินอยู่แล้ว กรุณาเช็คเอ้าท์ก่อนทำการเช็คอินใหม่.")
+		userState[userID] = "wait status worktimeConfirmCheckOut"
+		return
+	}
+
+	// ดึง employee_info_id ที่เกี่ยวข้อง
+	// employeeID := userInfo.EmployeeInfo.EmployeeInfo_ID
+
+	// บันทึกการเช็คอิน
+	err = RecordCheckIn(db, userInfo.UserInfo_ID)
+	if err != nil {
+		log.Println(err)
 		sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการบันทึก Check-in กรุณาลองใหม่.")
 		return
 	}
 
-	sendReply(bot, event.ReplyToken, fmt.Sprintf("เช็คอินสำเร็จสำหรับ %s", employeeInfo.Name))
+	sendReply(bot, event.ReplyToken, fmt.Sprintf("เช็คอินสำเร็จสำหรับ %s", userInfo.Name))
 	userState[userID] = "wait status worktimeConfirmCheckOut"
 }
-
 
 func handleworktimeConfirmCheckOut(bot *linebot.Client, event *linebot.Event, userID string) {
 	if userState[userID] != "wait status worktimeConfirmCheckOut" {
@@ -322,26 +326,38 @@ func handleworktimeConfirmCheckOut(bot *linebot.Client, event *linebot.Event, us
 	}
 	defer db.Close()
 
-	// ดึงข้อมูล employee_info_id จาก LINE User ID
-	employeeInfo, err := GetEmployeeByLINEID(db, userID)
+	// ดึงข้อมูลผู้ใช้จาก LINE User ID
+	userInfo, err := GetUserInfoByLINEID(db, userID)
 	if err != nil {
-		sendReply(bot, event.ReplyToken, "ไม่พบข้อมูลพนักงาน กรุณาลองใหม่.")
+		sendReply(bot, event.ReplyToken, "ไม่พบข้อมูลผู้ใช้ กรุณาลองใหม่.")
 		return
 	}
 
-	// บันทึกการเช็คเอาท์
-	err = RecordCheckOut(db, employeeInfo.EmployeeInfo_ID)
+	// ตรวจสอบการเช็คอิน
+	checkedIn, err := IsEmployeeCheckedIn(db, userInfo.UserInfo_ID)
 	if err != nil {
-		log.Println("Error recording Check-out:", err)
+		log.Println("Error checking check-in status:", err)
+		sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการตรวจสอบสถานะ กรุณาลองใหม่.")
+		return
+	}
+
+	// หากยังไม่ได้เช็คอิน
+	if !checkedIn {
+		sendReply(bot, event.ReplyToken, "คุณยังไม่ได้เช็คอิน กรุณาเช็คอินก่อนทำการเช็คเอ้าท์.")
+		return
+	}
+
+	// บันทึกการเช็คเอ้าท์
+	err = RecordCheckOut(db, userInfo.UserInfo_ID)
+	if err != nil {
+		log.Println(err)
 		sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการบันทึก Check-out กรุณาลองใหม่.")
 		return
 	}
 
-	sendReply(bot, event.ReplyToken, fmt.Sprintf("เช็คเอาท์สำเร็จสำหรับ %s", employeeInfo.Name))
-	userState[userID] = "wait status worktime"
+	sendReply(bot, event.ReplyToken, fmt.Sprintf("เช็คเอ้าท์สำเร็จสำหรับ %s", userInfo.Name))
+	userState[userID] = "wait status worktimeConfirmCheckIn"
 }
-
-
 
 func resetUserState(userID string) {
 	delete(userState, userID)
@@ -351,6 +367,7 @@ func resetUserState(userID string) {
 }
 
 func handlePateintInfo(bot *linebot.Client, event *linebot.Event, userID string) {
+
 	state, exists := getUserState(userID)
 	if !exists || state != "wait status ElderlyInfoRequest" {
 		log.Printf("Invalid state for user %s. Current state: %s", userID, state)
@@ -358,32 +375,16 @@ func handlePateintInfo(bot *linebot.Client, event *linebot.Event, userID string)
 		return
 	}
 
-	// ป้องกันการประมวลผลซ้ำ
-	if userActivity[userID] == "processing" {
-		sendReply(bot, event.ReplyToken, "คำขอของคุณกำลังดำเนินการ กรุณารอสักครู่.")
-		return
-	}
-	userActivity[userID] = "processing"
-	defer func() { userActivity[userID] = "" }() // รีเซ็ตสถานะเมื่อเสร็จสิ้น
+	// // ป้องกันการประมวลผลซ้ำ
+	// if userActivity[userID] == "processing" {
+	// 	sendReply(bot, event.ReplyToken, "คำขอของคุณกำลังดำเนินการ กรุณารอสักครู่.")
+	// 	return
+	// }
+	// userActivity[userID] = "processing"
+	// defer func() { userActivity[userID] = "" }() // รีเซ็ตสถานะเมื่อเสร็จสิ้น
 
 	// ดึงข้อความที่ผู้ใช้ส่งมา
 	message := event.Message.(*linebot.TextMessage).Text
-
-	// ตรวจสอบ employeeID ใน state
-	employeeIDStr, exists := userState[userID+"_employeeID"]
-	if !exists {
-		log.Println("Employee ID not found in state")
-		sendReply(bot, event.ReplyToken, "กรุณา Check-in ก่อน\nที่เมนู 'ลงเวลาเข้าและออกงาน'")
-		return
-	}
-
-	// แปลง employeeID เป็นตัวเลข
-	employeeID, err := strconv.Atoi(employeeIDStr)
-	if err != nil {
-		log.Println("Error parsing employee ID:", err)
-		sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการดึงข้อมูลพนักงาน.")
-		return
-	}
 
 	db, err := database.ConnectToDB()
 	if err != nil {
@@ -392,19 +393,6 @@ func handlePateintInfo(bot *linebot.Client, event *linebot.Event, userID string)
 		return
 	}
 	defer db.Close()
-
-	// ตรวจสอบสถานะ Check-in ของพนักงาน
-	checkedIn, err := IsEmployeeCheckedIn(db, employeeID)
-	if err != nil {
-		log.Println("Error checking employee status:", err)
-		sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการตรวจสอบสถานะ กรุณาลองใหม่.")
-		return
-	}
-
-	if !checkedIn {
-		sendReply(bot, event.ReplyToken, "กรุณา Check-in ก่อน\nที่เมนู 'ลงเวลาเข้าและออกงาน'")
-		return
-	}
 
 	// หากผู้ใช้ส่งข้อความ "ข้อมูลผู้สูงอายุ"
 	if strings.TrimSpace(message) == "ค้นหาข้อมูลผู้สูงอายุ" {
@@ -447,23 +435,6 @@ func handleServiceInfo(bot *linebot.Client, event *linebot.Event, State string) 
 
 	// ดึงข้อความที่ผู้ใช้ส่งมา
 	message := event.Message.(*linebot.TextMessage).Text
-	// log.Println("Message pateint:", message)
-
-	// ตรวจสอบ employeeID ใน state
-	employeeIDStr, exists := userState[State+"_employeeID"]
-	if !exists {
-		log.Println("Employee ID not found in state")
-		sendReply(bot, event.ReplyToken, "กรุณา Check-in ก่อน\nที่เมนู 'ลงเวลาเข้าและออกงาน'")
-		return
-	}
-
-	// แปลง employeeID เป็นตัวเลข
-	employeeID, err := strconv.Atoi(employeeIDStr)
-	if err != nil {
-		log.Println("Error parsing employee ID:", err)
-		sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการดึงข้อมูลพนักงาน.")
-		return
-	}
 
 	// เชื่อมต่อกับฐานข้อมูลและค้นหาข้อมูลผู้ป่วย
 	db, err := database.ConnectToDB()
@@ -474,13 +445,22 @@ func handleServiceInfo(bot *linebot.Client, event *linebot.Event, State string) 
 	}
 	defer db.Close()
 
-	// ตรวจสอบสถานะ Check-in ของพนักงาน
-	checkedIn, err := IsEmployeeCheckedIn(db, employeeID)
+	// ตรวจสอบว่าเช็คอินแล้วหรือไม่ โดยใช้ user_info_id
+	userInfo, err := GetUserInfoByLINEID(db, event.Source.UserID)
 	if err != nil {
-		log.Println("Error checking employee status:", err)
+		sendReply(bot, event.ReplyToken, "ไม่พบข้อมูลผู้ใช้ กรุณาลองใหม่.")
+		return
+	}
+
+	// ตรวจสอบสถานะการเช็คอินของผู้ใช้
+	checkedIn, err := IsEmployeeCheckedIn(db, userInfo.UserInfo_ID)
+	if err != nil {
+		log.Println("Error checking check-in status:", err)
 		sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการตรวจสอบสถานะ กรุณาลองใหม่.")
 		return
 	}
+
+	// ถ้ายังไม่ได้เช็คอิน
 	if !checkedIn {
 		sendReply(bot, event.ReplyToken, "กรุณา Check-in ก่อน\nที่เมนู 'ลงเวลาเข้าและออกงาน'")
 		return
@@ -513,7 +493,8 @@ func handleServiceInfo(bot *linebot.Client, event *linebot.Event, State string) 
 
 	replyMessage := FormatServiceInfo([]models.Activityrecord{*service})
 	log.Println("ข้อมูลผู้สูงอายุ :", replyMessage)
-	// log.Println("reply Message Format: ", replyMessage)
+
+	// สร้าง Quick Reply สำหรับกิจกรรม
 	quickReplyActivities := createQuickReplyActivities()
 	if _, err := bot.ReplyMessage(
 		event.ReplyToken,
@@ -523,25 +504,23 @@ func handleServiceInfo(bot *linebot.Client, event *linebot.Event, State string) 
 		sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการส่งข้อความ กรุณาลองใหม่.")
 	}
 
+	// บันทึก cardID สำหรับใช้ในฟังก์ชันถัดไป
 	usercardidState[State] = cardID
-	// log.Printf("Saved card_id for user %s: %s", State, cardID)
 
 	// เปลี่ยนสถานะผู้ใช้หลังจากได้รับข้อมูล
 	userState[State] = "wait status Activityrecord"
 	log.Printf("Set user state to wait status Activityrecord for user %s", State)
-
 }
 
 func handleActivityrecord(bot *linebot.Client, event *linebot.Event, State string) {
 	log.Println("wait status Activityrecord:", userState)
-	// ตรวจสอบสถานะของผู้ใช้
+
 	if userState[State] != "wait status Activityrecord" {
 		log.Printf("Invalid state for user %s. Current state: %s", State, userState[State])
 		sendReply(bot, event.ReplyToken, "กรุณาเลือกกิจกรรมใหม่:")
 		return
 	}
 
-	// รับข้อความกิจกรรมจากผู้ใช้
 	message, ok := event.Message.(*linebot.TextMessage)
 	if !ok {
 		log.Println("Event is not a text message")
@@ -566,7 +545,6 @@ func handleActivityrecord(bot *linebot.Client, event *linebot.Event, State strin
 		linebot.NewQuickReplyButton("", linebot.NewMessageAction("เริ่มกิจกรรม", "เริ่มกิจกรรม")),
 	)
 
-	// ส่งข้อความให้ผู้ใช้กด "เริ่มกิจกรรม"
 	sendReplyWithQuickReply(bot, event.ReplyToken, "กรุณากดปุ่ม 'เริ่มกิจกรรม' เพื่อเริ่มบันทึกเวลา", quickReply)
 
 	// อัปเดตสถานะผู้ใช้
@@ -582,7 +560,6 @@ func handleActivityStart(bot *linebot.Client, event *linebot.Event, State string
 		return
 	}
 
-	// รับข้อความกิจกรรมจากผู้ใช้
 	message, ok := event.Message.(*linebot.TextMessage)
 	if !ok {
 		log.Println("Event is not a text message")
@@ -590,7 +567,7 @@ func handleActivityStart(bot *linebot.Client, event *linebot.Event, State string
 	}
 
 	starttime := strings.TrimSpace(message.Text)
-	log.Printf("Received activity input: %s", starttime)
+	log.Printf("Received activity input(handleActivityStart): %s", starttime)
 
 	if starttime != "เริ่มกิจกรรม" {
 		return
@@ -609,43 +586,68 @@ func handleActivityStart(bot *linebot.Client, event *linebot.Event, State string
 		sendReply(bot, event.ReplyToken, "ไม่พบข้อมูลบัตรประชาชน กรุณากรอกใหม่")
 		return
 	}
-	employeeIDStr, exists := userState[State+"_employeeID"]
-	if !exists || employeeIDStr == "" {
-		sendReply(bot, event.ReplyToken, "ไม่พบข้อมูลพนักงาน กรุณาลองใหม่")
-		return
-	}
-	employeeID, err := strconv.Atoi(employeeIDStr)
+
+	// ดึง user_info_id จาก event
+	userID := event.Source.UserID
+
+	// ดึงข้อมูล userInfo จากฐานข้อมูล
+	userInfo, err := GetUserInfoByLINEID(db, userID)
 	if err != nil {
-		log.Printf("Error parsing employeeID: %v", err)
-		sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการแปลงข้อมูลพนักงาน กรุณาลองใหม่")
+		log.Println("Error fetching user info:", err)
+		sendReply(bot, event.ReplyToken, "ไม่พบข้อมูลผู้ใช้ กรุณาลองใหม่.")
 		return
 	}
-	// ดึง patient_info_id โดยใช้ cardID
+
+	// ตรวจสอบสถานะการเช็คอินจาก user_info_id
+	checkedIn, err := IsEmployeeCheckedIn(db, userInfo.UserInfo_ID)
+	if err != nil {
+		log.Println("Error checking check-in status:", err)
+		sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการตรวจสอบสถานะ กรุณาลองใหม่.")
+		return
+	}
+
+	// ถ้ายังไม่ได้เช็คอิน
+	if !checkedIn {
+		sendReply(bot, event.ReplyToken, "กรุณาเช็คอินก่อน\nที่เมนู 'ลงเวลาเข้าและออกงาน'")
+		return
+	}
+
+	// ดึงข้อมูลผู้ป่วยจากฐานข้อมูล
 	patient, err := GetPatientInfoByName(db, cardID)
 	if err != nil {
 		log.Printf("Error fetching patient_info_id: %v", err)
 		sendReply(bot, event.ReplyToken, "ไม่พบข้อมูลผู้ป่วย กรุณาลองใหม่")
 		return
 	}
+
+	// สร้าง activityRecord
 	activityRecord := &models.Activityrecord{
 		PatientInfo: models.PatientInfo{
 			CardID:         cardID,
-			Name:           patient.PatientInfo.Name, // กำหนดค่า Name จากฐานข้อมูล
+			Name:           patient.PatientInfo.Name,
 			PatientInfo_ID: patient.PatientInfo.PatientInfo_ID,
 		},
 		ServiceInfo: models.ServiceInfo{
 			Activity: userActivity[State],
 		},
 		EmployeeInfo: models.EmployeeInfo{
-			EmployeeInfo_ID: employeeID,
+			EmployeeInfo_ID: userInfo.UserInfo_ID, // ใช้ user_info_id แทน employee_id
 		},
 		StartTime: time.Now(),
+		UserInfo: models.User_info{
+			UserInfo_ID: userInfo.UserInfo_ID,
+			Create_by:   userInfo.Name,
+			Write_by:    userInfo.Name,
+		},
 	}
+
+	// บันทึกกิจกรรม
 	if err := SaveActivityRecord(db, activityRecord); err != nil {
 		log.Printf("Error saving activity record: %v", err)
 		sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการบันทึกกิจกรรม กรุณาลองใหม่")
 		return
 	}
+
 	activityRecord.PatientInfo.Name = patient.PatientInfo.Name
 	replyMessage := FormatactivityRecordStarttime([]models.Activityrecord{*activityRecord})
 
@@ -660,9 +662,10 @@ func handleActivityStart(bot *linebot.Client, event *linebot.Event, State string
 		log.Println("Error sending Quick Reply (handleActivityStart):", err)
 	}
 
-	// sendReplyWithQuickReply(bot, event.ReplyToken, "กรุณากดปุ่ม 'เสร็จสิ้น' เมื่อทำกิจกรรมเสร็จ", quickReply)
+	// เปลี่ยนสถานะผู้ใช้
 	userState[State] = "wait status ActivityEnd"
 }
+
 func handleActivityEnd(bot *linebot.Client, event *linebot.Event, userID string) {
 	if userState[userID] != "wait status ActivityEnd" {
 		log.Printf("Invalid state for user %s. Current state: %s", userID, userState[userID])
@@ -691,11 +694,66 @@ func handleActivityEnd(bot *linebot.Client, event *linebot.Event, userID string)
 	}
 	defer db.Close()
 
-	cardID, exists := usercardidState[userID]
-	if !exists || cardID == "" {
-		sendReply(bot, event.ReplyToken, "ไม่พบข้อมูลบัตรประชาชน กรุณากรอกใหม่")
+	// ขอชื่อพนักงาน
+	sendReply(bot, event.ReplyToken, "กรุณากรอกชื่อพนักงานที่ให้บริการ:")
+
+	// สถานะเปลี่ยนไปเป็นกรอกชื่อพนักงาน
+	userState[userID] = "wait status Saveavtivityend"
+}
+
+func handleSaveavtivityend(bot *linebot.Client, event *linebot.Event, userID string) {
+    if userState[userID] != "wait status Saveavtivityend" {
+        log.Printf("Invalid state for user %s. Current state: %s", userID, userState[userID])
+        return
+    }
+
+    // รับชื่อพนักงานจากผู้ใช้
+    employeeName := strings.TrimSpace(event.Message.(*linebot.TextMessage).Text)
+    log.Printf("Received employee name: %s", employeeName)
+
+    if employeeName == "" {
+        sendReply(bot, event.ReplyToken, "กรุณากรอกชื่อพนักงานที่ให้บริการ.")
+        return
+    }
+
+    // เชื่อมต่อฐานข้อมูล
+    db, err := database.ConnectToDB()
+    if err != nil {
+        log.Printf("Database connection error: %v", err)
+        sendReply(bot, event.ReplyToken, "ไม่สามารถเชื่อมต่อฐานข้อมูลได้ กรุณาลองใหม่")
+        return
+    }
+    defer db.Close()
+
+    // ใช้ฟังก์ชันแยกเพื่อค้นหา employee_info_id
+    employeeID, err := GetEmployeeIDByName(db, employeeName)
+    if err != nil {
+        sendReply(bot, event.ReplyToken, err.Error())
+        return
+    }
+
+    // ตรวจสอบ cardID
+    cardID, exists := usercardidState[userID]
+    if !exists || cardID == "" {
+        sendReply(bot, event.ReplyToken, "ไม่พบข้อมูลบัตรประชาชน กรุณากรอกใหม่")
+        return
+    }
+
+    // ดึง activityRecord_ID
+    activityRecordID, err := GetActivityRecordID(db, cardID)
+    if err != nil {
+        sendReply(bot, event.ReplyToken, err.Error())
+        return
+    }
+
+	// ดึงข้อมูล userInfo จากฐานข้อมูล
+	userInfo, err := GetUserInfoByLINEID(db, userID)
+	if err != nil {
+		log.Println("Error fetching user info:", err)
+		sendReply(bot, event.ReplyToken, "ไม่พบข้อมูลผู้ใช้ กรุณาลองใหม่.")
 		return
 	}
+
 	// ดึง patient_info_id โดยใช้ cardID
 	patient, err := GetPatientInfoByName(db, cardID)
 	if err != nil {
@@ -704,33 +762,102 @@ func handleActivityEnd(bot *linebot.Client, event *linebot.Event, userID string)
 		return
 	}
 
-	// บันทึก end_time และ employee_info_id
-	activityRecord := &models.Activityrecord{
-		PatientInfo: models.PatientInfo{
-			CardID:         cardID,
-			Name:           patient.PatientInfo.Name, // กำหนดค่า Name จากฐานข้อมูล
-			PatientInfo_ID: patient.PatientInfo.PatientInfo_ID,
-		},
-		ServiceInfo: models.ServiceInfo{
-			Activity: userActivity[userID],
-		},
-		EndTime: time.Now(),
-	}
-	if err := UpdateActivityEndTime(db, activityRecord); err != nil {
-		log.Printf("Error updating end time: %v", err)
-		sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการบันทึกเวลาสิ้นสุด กรุณาลองใหม่")
-		return
-	}
-	activityRecord.PatientInfo.Name = patient.PatientInfo.Name
-	replyMessage := FormatactivityRecordEndtime([]models.Activityrecord{*activityRecord})
-	if _, err := bot.ReplyMessage(event.ReplyToken, linebot.NewTextMessage(replyMessage)).Do(); err != nil {
-		log.Println("Error replying message (handleActivityEnd):", err)
-	}
-	log.Println("บันทึกกิจกรรมสำเร็จ :", replyMessage)
+    // บันทึกข้อมูลใน activity_record
+    activityRecord := &models.Activityrecord{
+        ActivityRecord_ID: activityRecordID, // ใช้ ID ที่ดึงมา
+        PatientInfo: models.PatientInfo{
+            CardID:         cardID,
+            PatientInfo_ID: patient.PatientInfo.PatientInfo_ID,
+        },
+        EndTime:      time.Now(),
+        EmployeeInfo: models.EmployeeInfo{EmployeeInfo_ID: employeeID},
+		UserInfo:     models.User_info{UserInfo_ID: userInfo.UserInfo_ID}, // ใช้ userID เป็น write_by
+    }
 
-	resetUserState(userID)
-	userState[userID] = ""
+    // log.Println("activityRecord", activityRecord)
+
+    // บันทึกข้อมูลในฐานข้อมูล
+    if err := UpdateActivityEndTime(db, activityRecord); err != nil {
+        log.Printf("Error updating end time: %v", err)
+        sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการบันทึกเวลาสิ้นสุด กรุณาลองใหม่")
+        return
+    }
+
+    sendReply(bot, event.ReplyToken, "บันทึกกิจกรรมสำเร็จ")
+    resetUserState(userID)
 }
+
+
+
+
+// func handleActivityEnd(bot *linebot.Client, event *linebot.Event, userID string) {
+// 	if userState[userID] != "wait status ActivityEnd" {
+// 		log.Printf("Invalid state for user %s. Current state: %s", userID, userState[userID])
+// 		return
+// 	}
+// 	// รับข้อความกิจกรรมจากผู้ใช้
+// 	message, ok := event.Message.(*linebot.TextMessage)
+// 	if !ok {
+// 		log.Println("Event is not a text message")
+// 		return
+// 	}
+
+// 	endtime := strings.TrimSpace(message.Text)
+// 	log.Printf("Received activity input: %s", endtime)
+
+// 	if endtime != "เสร็จสิ้น" {
+// 		sendReply(bot, event.ReplyToken, "กรุณาพิมพ์ 'เสร็จสิ้น' เพื่อบันทึกเวลาสิ้นสุด")
+// 		return
+// 	}
+
+// 	db, err := database.ConnectToDB()
+// 	if err != nil {
+// 		log.Printf("Database connection error: %v", err)
+// 		sendReply(bot, event.ReplyToken, "ไม่สามารถเชื่อมต่อฐานข้อมูลได้ กรุณาลองใหม่")
+// 		return
+// 	}
+// 	defer db.Close()
+
+// 	cardID, exists := usercardidState[userID]
+// 	if !exists || cardID == "" {
+// 		sendReply(bot, event.ReplyToken, "ไม่พบข้อมูลบัตรประชาชน กรุณากรอกใหม่")
+// 		return
+// 	}
+// 	// ดึง patient_info_id โดยใช้ cardID
+// 	patient, err := GetPatientInfoByName(db, cardID)
+// 	if err != nil {
+// 		log.Printf("Error fetching patient_info_id: %v", err)
+// 		sendReply(bot, event.ReplyToken, "ไม่พบข้อมูลผู้ป่วย กรุณาลองใหม่")
+// 		return
+// 	}
+
+// 	// บันทึก end_time และ employee_info_id
+// 	activityRecord := &models.Activityrecord{
+// 		PatientInfo: models.PatientInfo{
+// 			CardID:         cardID,
+// 			Name:           patient.PatientInfo.Name, // กำหนดค่า Name จากฐานข้อมูล
+// 			PatientInfo_ID: patient.PatientInfo.PatientInfo_ID,
+// 		},
+// 		ServiceInfo: models.ServiceInfo{
+// 			Activity: userActivity[userID],
+// 		},
+// 		EndTime: time.Now(),
+// 	}
+// 	if err := UpdateActivityEndTime(db, activityRecord); err != nil {
+// 		log.Printf("Error updating end time: %v", err)
+// 		sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการบันทึกเวลาสิ้นสุด กรุณาลองใหม่")
+// 		return
+// 	}
+// 	activityRecord.PatientInfo.Name = patient.PatientInfo.Name
+// 	replyMessage := FormatactivityRecordEndtime([]models.Activityrecord{*activityRecord})
+// 	if _, err := bot.ReplyMessage(event.ReplyToken, linebot.NewTextMessage(replyMessage)).Do(); err != nil {
+// 		log.Println("Error replying message (handleActivityEnd):", err)
+// 	}
+// 	log.Println("บันทึกกิจกรรมสำเร็จ :", replyMessage)
+
+// 	resetUserState(userID)
+// 	userState[userID] = ""
+// }
 
 func createQuickReplyActivities() linebot.QuickReplyItems {
 	activities := []string{
@@ -772,269 +899,6 @@ func validateActivity(activity string) bool {
 		}
 	}
 	return false
-}
-
-func handleServiceHistory(bot *linebot.Client, event *linebot.Event, State string) {
-	if userState[State] != "wait status HistoryRequest" {
-		log.Printf("Invalid state for user %s. Current state: %s", State, userState[State])
-		return
-	}
-
-	employeeIDStr, exists := userState[State+"_employeeID"]
-	if !exists {
-		log.Println("Employee ID not found in state")
-		return
-	}
-
-	// แปลง employeeID เป็นตัวเลข
-	employeeID, err := strconv.Atoi(employeeIDStr)
-	if err != nil {
-		log.Println("Error parsing employee ID:", err)
-		return
-	}
-
-	db, err := database.ConnectToDB()
-	if err != nil {
-		log.Println("Database connection error:", err)
-		return
-	}
-	defer db.Close()
-
-	// ตรวจสอบสถานะ Check-in ของพนักงาน
-	checkedIn, err := IsEmployeeCheckedIn(db, employeeID)
-	if err != nil {
-		log.Println("Error checking employee status:", err)
-		return
-	}
-	if !checkedIn {
-		sendReply(bot, event.ReplyToken, "กรุณา Check-in ก่อน\nที่เมนู 'ลงเวลาเข้าและออกงาน'")
-		return
-	}
-
-	// รับข้อความจากผู้ใช้
-	message := event.Message.(*linebot.TextMessage).Text
-	if message == "ประวัติการเข้ารับบริการ" {
-		quickReply := linebot.NewQuickReplyItems(
-			linebot.NewQuickReplyButton("", linebot.NewMessageAction("ทั้งหมด", "ทั้งหมด")),
-			linebot.NewQuickReplyButton("", linebot.NewMessageAction("ปีนี้", "ปีนี้")),
-			linebot.NewQuickReplyButton("", linebot.NewMessageAction("เดือนนี้", "เดือนนี้")),
-			linebot.NewQuickReplyButton("", linebot.NewMessageAction("สัปดาห์นี้", "สัปดาห์นี้")),
-			linebot.NewQuickReplyButton("", linebot.NewMessageAction("วันนี้", "วันนี้")),
-			linebot.NewQuickReplyButton("", linebot.NewMessageAction("ระบุช่วงเวลา", "ระบุช่วงเวลา")),
-		)
-
-		sendReplyWithQuickReply(bot, event.ReplyToken, "กรุณาเลือกประเภทการดูประวัติ:", quickReply)
-		return
-	}
-	if message == "ทั้งหมด" {
-		userState[State] = "wait status HistoryAll"
-		handleActivityHistoryAll(bot, event, State)
-		return
-	} else if message == "ปีนี้" {
-		userState[State] = "wait status HistoryofYear"
-		handleActivityHistoryofYear(bot, event, State)
-		return
-	} else if message == "เดือนนี้" {
-		userState[State] = "wait status HistoryofMonth"
-		handleActivityHistoryofMonth(bot, event, State)
-	} else if message == "สัปดาห์นี้" {
-		userState[State] = "wait status HistoryofWeek"
-		handleActivityHistoryofWeek(bot, event, State)
-	} else if message == "วันนี้" {
-		userState[State] = "wait status HistoryofDay"
-		handleActivityHistoryofDay(bot, event, State)
-	} else if message == "ระบุช่วงเวลา" {
-		userState[State] = "wait status HistoryofSet"
-		handleActivityHistoryofSet(bot, event, State)
-		return
-	} else {
-		// sendReply(bot, event.ReplyToken, "กรุณาเลือกประเภแทการดูประวัติอีกครั้ง:")
-		return
-	}
-	log.Printf("Set user state to %s for user %s", userState[State], State)
-}
-func handleActivityHistoryAll(bot *linebot.Client, event *linebot.Event, State string) {
-	log.Println("wait status HistoryoAll:", userState)
-	if userState[State] != "wait status HistoryAll" {
-		log.Printf("Invalid state for user %s. Current state: %s", State, userState[State])
-		return
-	}
-	db, err := database.ConnectToDB()
-	if err != nil {
-		log.Println("Database connection error:", err)
-		// sendReply(bot, event.ReplyToken, "ไม่สามารถเชื่อมต่อฐานข้อมูลได้ กรุณาลองใหม่.")
-		return
-	}
-	defer db.Close()
-	historyRecords, err := historyALL(db)
-	if err != nil {
-		log.Println("Error fetching yearly activity history:", err)
-		sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการดึงข้อมูลปีนี้.")
-		return
-	}
-	replyMessage := FormatHistoryAll(historyRecords)
-	if _, err := bot.ReplyMessage(event.ReplyToken, linebot.NewTextMessage(replyMessage)).Do(); err != nil {
-		log.Println("Error replying message (handleActivityHistoryAll):", err)
-	}
-	log.Println("ประวัติกิจกรรมทั้งหมด:", replyMessage)
-
-}
-func handleActivityHistoryofYear(bot *linebot.Client, event *linebot.Event, State string) {
-	log.Println("wait status HistoryofYear:", userState)
-	if userState[State] != "wait status HistoryofYear" {
-		log.Printf("Invalid state for user %s. Current state: %s", State, userState[State])
-		return
-	}
-
-	db, err := database.ConnectToDB()
-	if err != nil {
-		log.Println("Database connection error:", err)
-		// sendReply(bot, event.ReplyToken, "ไม่สามารถเชื่อมต่อฐานข้อมูลได้ กรุณาลองใหม่.")
-		return
-	}
-	defer db.Close()
-	historyRecords, err := historyOfYear(db)
-	if err != nil {
-		log.Println("Error fetching yearly activity history:", err)
-		sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการดึงข้อมูลปีนี้.")
-		return
-	}
-	replyMessage := FormatHistoryofYear(historyRecords)
-	if _, err := bot.ReplyMessage(event.ReplyToken, linebot.NewTextMessage(replyMessage)).Do(); err != nil {
-		log.Println("Error replying message (handleActivityHistoryofYear):", err)
-	}
-	log.Println("ประวัติกิจกรรมปีนี้:", replyMessage)
-
-}
-func handleActivityHistoryofMonth(bot *linebot.Client, event *linebot.Event, State string) {
-	log.Println("wait status HistoryofMonth:", userState)
-	if userState[State] != "wait status HistoryofMonth" {
-		log.Printf("Invalid state for user %s. Current state: %s", State, userState[State])
-		return
-	}
-
-	db, err := database.ConnectToDB()
-	if err != nil {
-		log.Println("Database connection error:", err)
-		// sendReply(bot, event.ReplyToken, "ไม่สามารถเชื่อมต่อฐานข้อมูลได้ กรุณาลองใหม่.")
-		return
-	}
-	defer db.Close()
-	historyRecords, err := historyOfMonth(db)
-	if err != nil {
-		log.Println("Error fetching yearly activity history:", err)
-		sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการดึงข้อมูลสัปดาห์นี้.")
-		return
-	}
-	replyMessage := FormatHistoryofMonth(historyRecords)
-	if _, err := bot.ReplyMessage(event.ReplyToken, linebot.NewTextMessage(replyMessage)).Do(); err != nil {
-		log.Println("Error replying message (handleActivityHistoryofMonth):", err)
-	}
-	log.Println("ประวัติกิจกรรมเดือนนี้:", replyMessage)
-
-}
-func handleActivityHistoryofWeek(bot *linebot.Client, event *linebot.Event, State string) {
-	log.Println("wait status HistoryofWeek:", userState)
-	if userState[State] != "wait status HistoryofWeek" {
-		log.Printf("Invalid state for user %s. Current state: %s", State, userState[State])
-		return
-	}
-
-	db, err := database.ConnectToDB()
-	if err != nil {
-		log.Println("Database connection error:", err)
-		// sendReply(bot, event.ReplyToken, "ไม่สามารถเชื่อมต่อฐานข้อมูลได้ กรุณาลองใหม่.")
-		return
-	}
-	defer db.Close()
-	historyRecords, err := historyOfWeek(db)
-	if err != nil {
-		log.Println("Error fetching yearly activity history:", err)
-		sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการดึงข้อมูลสัปดาห์นี้.")
-		return
-	}
-	replyMessage := FormatHistoryofWeek(historyRecords)
-	if _, err := bot.ReplyMessage(event.ReplyToken, linebot.NewTextMessage(replyMessage)).Do(); err != nil {
-		log.Println("Error replying message (handleActivityHistoryofWeek):", err)
-	}
-	log.Println("ประวัติกิจกรรมสัปดาห์นี้:", replyMessage)
-
-}
-func handleActivityHistoryofDay(bot *linebot.Client, event *linebot.Event, State string) {
-	log.Println("wait status HistoryofDay:", userState)
-	if userState[State] != "wait status HistoryofDay" {
-		log.Printf("Invalid state for user %s. Current state: %s", State, userState[State])
-		return
-	}
-
-	db, err := database.ConnectToDB()
-	if err != nil {
-		log.Println("Database connection error:", err)
-		sendReply(bot, event.ReplyToken, "ไม่สามารถเชื่อมต่อฐานข้อมูลได้ กรุณาลองใหม่.")
-		return
-	}
-	defer db.Close()
-	historyRecords, err := historyOfDay(db)
-	if err != nil {
-		log.Println("Error fetching yearly activity history:", err)
-		sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการดึงข้อมูลสัปดาห์นี้.")
-		return
-	}
-	replyMessage := FormatHistoryofDay(historyRecords)
-	if _, err := bot.ReplyMessage(event.ReplyToken, linebot.NewTextMessage(replyMessage)).Do(); err != nil {
-		log.Println("Error replying message (handleActivityHistoryofDay):", err)
-	}
-	log.Println("ประวัติกิจกรรมวันนี้:", replyMessage)
-
-}
-func handleActivityHistoryofSet(bot *linebot.Client, event *linebot.Event, State string) {
-	log.Println("wait status HistoryofSet:", userState)
-	if userState[State] != "wait status HistoryofSet" {
-		log.Printf("Invalid state for user %s. Current state: %s", State, userState[State])
-		return
-	}
-	message := event.Message.(*linebot.TextMessage).Text
-
-	// แยกข้อความเพื่อดึงช่วงวันที่
-	dates := strings.Split(message, "ถึง")
-	if len(dates) != 2 {
-		sendReply(bot, event.ReplyToken, "กรุณาระบุช่วงวันที่ในรูปแบบ YYYY-MM-DD ถึง YYYY-MM-DD\nตัวอย่าง: 2025-01-01 ถึง 2025-02-01")
-		return
-	}
-
-	startDate := strings.TrimSpace(dates[0])
-	endDate := strings.TrimSpace(dates[1])
-
-	// ตรวจสอบรูปแบบวันที่
-	if _, err := time.Parse("2006-01-02", startDate); err != nil {
-		sendReply(bot, event.ReplyToken, "รูปแบบวันที่เริ่มต้นไม่ถูกต้อง กรุณาระบุในรูปแบบ YYYY-MM-DD เช่น 2025-01-01")
-		return
-	}
-	if _, err := time.Parse("2006-01-02", endDate); err != nil {
-		sendReply(bot, event.ReplyToken, "รูปแบบวันที่สิ้นสุดไม่ถูกต้อง กรุณาระบุในรูปแบบ YYYY-MM-DD เช่น 2025-02-01")
-		return
-	}
-
-	// เชื่อมต่อฐานข้อมูล
-	db, err := database.ConnectToDB()
-	if err != nil {
-		log.Println("Database connection error:", err)
-		return
-	}
-	defer db.Close()
-
-	// ดึงข้อมูลจากฐานข้อมูล
-	historyRecords, err := historyOfSet(db, startDate, endDate)
-	if err != nil {
-		log.Println("Error fetching activity history for set dates:", err)
-		return
-	}
-
-	// ฟอร์แมตข้อความผลลัพธ์
-	replyMessage := FormatHistoryofSet(historyRecords, startDate, endDate)
-	if _, err := bot.ReplyMessage(event.ReplyToken, linebot.NewTextMessage(replyMessage)).Do(); err != nil {
-		log.Println("Error replying message (handleActivityHistoryofSet):", err)
-	}
 }
 
 func handleSystemManual(bot *linebot.Client, event *linebot.Event, State string) {
