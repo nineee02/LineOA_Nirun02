@@ -23,21 +23,15 @@ func HandleEvent(bot *linebot.Client, event *linebot.Event) {
 	text := event.Message.(*linebot.TextMessage).Text
 	log.Println("Text: ", text)
 	State := event.Source.UserID
-	// log.Println("userstate:", State)
+	log.Println("userstate:", State)
 
 	switch text {
-	case "NIRUN":
-		handleNirunStste(bot, event, event.Source.UserID)
 	case "ค้นหาข้อมูลผู้สูงอายุ":
 		handleElderlyInfoStste(bot, event, event.Source.UserID)
 	case "ลงเวลาเข้าและออกงาน":
 		handleWorktimeStste(bot, event, event.Source.UserID)
-	case "ประวัติการเข้ารับบริการ":
-		handleServiceHistoryStste(bot, event, event.Source.UserID)
 	case "บันทึกการเข้ารับบริการ":
 		handleServiceRecordStste(bot, event, event.Source.UserID)
-	// case "คู่มือการใช้งานระบบ":
-	// 	handleSystemManualStste(bot, event, event.Source.UserID)
 	default:
 		handleDefault(bot, event)
 	}
@@ -45,13 +39,8 @@ func HandleEvent(bot *linebot.Client, event *linebot.Event) {
 	state, exists := userState[State]
 	if exists {
 		switch state {
-		// case "wait status NirunRequest":
-		// 	handleNIRUN(bot, event, State)
-
 		case "wait status worktime":
 			handleWorktime(bot, event, State)
-		// case "wait status worktimeConfirm":
-		// 	handleworktimeConfirm(bot, event, State)
 		case "wait status worktimeConfirmCheckIn":
 			handleworktimeConfirmCheckIn(bot, event, State)
 		case "wait status worktimeConfirmCheckOut":
@@ -84,10 +73,6 @@ func setUserState(userID, state string) {
 func getUserState(userID string) (string, bool) {
 	state, exists := userState[userID]
 	return state, exists
-}
-
-func handleNirunStste(bot *linebot.Client, event *linebot.Event, State string) {
-	setUserState(State, "wait status NirunRequest")
 }
 
 func handleElderlyInfoStste(bot *linebot.Client, event *linebot.Event, State string) {
@@ -131,9 +116,6 @@ func handleServiceHistoryStste(bot *linebot.Client, event *linebot.Event, State 
 	setUserState(State, "wait status HistoryRequest")
 }
 
-// func handleSystemManualStste(bot *linebot.Client, event *linebot.Event, State string) {
-// 	setUserState(State, "wait status ManualRequest")
-// }
 
 // ************************************************************************************************************************
 
@@ -818,76 +800,6 @@ func handleSaveavtivityend(bot *linebot.Client, event *linebot.Event, userID str
 	resetUserState(userID)
 }
 
-
-
-// func handleActivityEnd(bot *linebot.Client, event *linebot.Event, userID string) {
-// 	if userState[userID] != "wait status ActivityEnd" {
-// 		log.Printf("Invalid state for user %s. Current state: %s", userID, userState[userID])
-// 		return
-// 	}
-// 	// รับข้อความกิจกรรมจากผู้ใช้
-// 	message, ok := event.Message.(*linebot.TextMessage)
-// 	if !ok {
-// 		log.Println("Event is not a text message")
-// 		return
-// 	}
-
-// 	endtime := strings.TrimSpace(message.Text)
-// 	log.Printf("Received activity input: %s", endtime)
-
-// 	if endtime != "เสร็จสิ้น" {
-// 		sendReply(bot, event.ReplyToken, "กรุณาพิมพ์ 'เสร็จสิ้น' เพื่อบันทึกเวลาสิ้นสุด")
-// 		return
-// 	}
-
-// 	db, err := database.ConnectToDB()
-// 	if err != nil {
-// 		log.Printf("Database connection error: %v", err)
-// 		sendReply(bot, event.ReplyToken, "ไม่สามารถเชื่อมต่อฐานข้อมูลได้ กรุณาลองใหม่")
-// 		return
-// 	}
-// 	defer db.Close()
-
-// 	cardID, exists := usercardidState[userID]
-// 	if !exists || cardID == "" {
-// 		sendReply(bot, event.ReplyToken, "ไม่พบข้อมูลบัตรประชาชน กรุณากรอกใหม่")
-// 		return
-// 	}
-// 	// ดึง patient_info_id โดยใช้ cardID
-// 	patient, err := GetPatientInfoByName(db, cardID)
-// 	if err != nil {
-// 		log.Printf("Error fetching patient_info_id: %v", err)
-// 		sendReply(bot, event.ReplyToken, "ไม่พบข้อมูลผู้ป่วย กรุณาลองใหม่")
-// 		return
-// 	}
-
-// 	// บันทึก end_time และ employee_info_id
-// 	activityRecord := &models.Activityrecord{
-// 		PatientInfo: models.PatientInfo{
-// 			CardID:         cardID,
-// 			Name:           patient.PatientInfo.Name, // กำหนดค่า Name จากฐานข้อมูล
-// 			PatientInfo_ID: patient.PatientInfo.PatientInfo_ID,
-// 		},
-// 		ServiceInfo: models.ServiceInfo{
-// 			Activity: userActivity[userID],
-// 		},
-// 		EndTime: time.Now(),
-// 	}
-// 	if err := UpdateActivityEndTime(db, activityRecord); err != nil {
-// 		log.Printf("Error updating end time: %v", err)
-// 		sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการบันทึกเวลาสิ้นสุด กรุณาลองใหม่")
-// 		return
-// 	}
-// 	activityRecord.PatientInfo.Name = patient.PatientInfo.Name
-// 	replyMessage := FormatactivityRecordEndtime([]models.Activityrecord{*activityRecord})
-// 	if _, err := bot.ReplyMessage(event.ReplyToken, linebot.NewTextMessage(replyMessage)).Do(); err != nil {
-// 		log.Println("Error replying message (handleActivityEnd):", err)
-// 	}
-// 	log.Println("บันทึกกิจกรรมสำเร็จ :", replyMessage)
-
-// 	resetUserState(userID)
-// 	userState[userID] = ""
-// }
 
 func createQuickReplyActivities() linebot.QuickReplyItems {
 	activities := []string{
