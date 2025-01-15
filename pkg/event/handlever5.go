@@ -26,11 +26,11 @@ func HandleEvent(bot *linebot.Client, event *linebot.Event) {
 	log.Println("userstate:", State)
 
 	switch text {
-	case "ค้นหาข้อมูลผู้สูงอายุ":
+	case "ค้นหาข้อมูล":
 		handleElderlyInfoStste(bot, event, event.Source.UserID)
-	case "ลงเวลาเข้าและออกงาน":
+	case "ลงเวลางาน":
 		handleWorktimeStste(bot, event, event.Source.UserID)
-	case "บันทึกการเข้ารับบริการ":
+	case "บันทึกกิจกรรม":
 		handleServiceRecordStste(bot, event, event.Source.UserID)
 	default:
 		handleDefault(bot, event)
@@ -401,7 +401,7 @@ func handlePateintInfo(bot *linebot.Client, event *linebot.Event, userID string)
 	defer db.Close()
 
 	// หากผู้ใช้ส่งข้อความ "ข้อมูลผู้สูงอายุ"
-	if strings.TrimSpace(message) == "ค้นหาข้อมูลผู้สูงอายุ" {
+	if strings.TrimSpace(message) == "ค้นหาข้อมูล" {
 		sendReply(bot, event.ReplyToken, "กรุณากรอกเลขบัตรประชาชน 13หลักของผู้เข้ารับบริการ\nตัวอย่างเช่น 1234567891234 :")
 		return
 	}
@@ -468,12 +468,12 @@ func handleServiceInfo(bot *linebot.Client, event *linebot.Event, State string) 
 
 	// ถ้ายังไม่ได้เช็คอิน
 	if !checkedIn {
-		sendReply(bot, event.ReplyToken, "กรุณา Check-in ก่อน\nที่เมนู 'ลงเวลาเข้าและออกงาน'")
+		sendReply(bot, event.ReplyToken, "กรุณา Check-in ก่อน\nที่เมนู 'ลงเวลางาน'")
 		return
 	}
 
 	// หากผู้ใช้ส่งข้อความ "บันทึกการเข้ารับบริการ"
-	if strings.TrimSpace(message) == "บันทึกการเข้ารับบริการ" {
+	if strings.TrimSpace(message) == "บันทึกกิจกรรม" {
 		sendReply(bot, event.ReplyToken, "กรุณากรอกเลขบัตรประชาชน 13หลักของผู้เข้ารับบริการ\nตัวอย่างเช่น 1234567891234 :")
 		return
 	}
