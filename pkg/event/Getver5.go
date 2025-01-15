@@ -33,6 +33,38 @@ func GetUserInfoByLINEID(db *sql.DB, lineUserID string) (*models.User_info, erro
 
 	return user, nil
 }
+func GetWorktimeRecordByUserID(db *sql.DB, userID string) (*models.WorktimeRecord, error) {
+	query := `
+        SELECT 
+            w.worktime_record_id, 
+            w.check_in, 
+            w.check_out, 
+            u.name AS user_name
+        FROM worktime_record w
+        JOIN user_info u ON w.user_info_id = u.user_info_id
+        WHERE u.user_info_id = ? AND w.check_out IS NULL
+    `
+	row := db.QueryRow(query, userID)
+
+	worktimeRecord := &models.WorktimeRecord{
+		UserInfo:      &models.User_info{},
+	}
+	err := row.Scan(
+		&worktimeRecord.WorktimeRecord_ID,
+		&worktimeRecord.CheckIn,
+		&worktimeRecord.CheckOut,
+		&worktimeRecord.UserInfo.Name,        
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil // ไม่มีข้อมูล
+		}
+		return nil, fmt.Errorf("error fetching worktime record: %v", err)
+	}
+
+	return worktimeRecord, nil
+}
+
 
 func GetWorktime(db *sql.DB, employeeCode string) (*models.WorktimeRecord, error) {
 	query := `
@@ -308,17 +340,17 @@ func GetServiceInfoIDByActivity(db *sql.DB, activity string) (int, error) {
 	return serviceInfoID, nil
 }
 func GetEmployeeIDByName(db *sql.DB, employeeName string) (int, error) {
-    var employeeID int
-    query := `SELECT employee_info_id FROM employee_info WHERE username = ?`
-    err := db.QueryRow(query, employeeName).Scan(&employeeID)
-    if err != nil {
-        if err == sql.ErrNoRows {
-            return 0, fmt.Errorf("ไม่พบพนักงานที่ชื่อ %s", employeeName)
-        }
-        log.Printf("Error fetching employee info: %v", err)
-        return 0, fmt.Errorf("เกิดข้อผิดพลาดในการค้นหาข้อมูลพนักงาน")
-    }
-    return employeeID, nil
+	var employeeID int
+	query := `SELECT employee_info_id FROM employee_info WHERE username = ?`
+	err := db.QueryRow(query, employeeName).Scan(&employeeID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return 0, fmt.Errorf("ไม่พบพนักงานที่ชื่อ %s", employeeName)
+		}
+		log.Printf("Error fetching employee info: %v", err)
+		return 0, fmt.Errorf("เกิดข้อผิดพลาดในการค้นหาข้อมูลพนักงาน")
+	}
+	return employeeID, nil
 }
 
 func SaveActivityRecord(db *sql.DB, activity *models.Activityrecord) error {
@@ -386,35 +418,35 @@ func SaveActivityRecord(db *sql.DB, activity *models.Activityrecord) error {
 
 }
 func GetActivityRecordID(db *sql.DB, cardID string) (int, error) {
-    var activityRecordID int
-    query := `
+	var activityRecordID int
+	query := `
         SELECT activity_record_id 
         FROM activity_record 
         WHERE patient_info_id = (SELECT patient_info_id FROM patient_info WHERE card_id = ?) 
           AND end_time IS NULL
     `
-    err := db.QueryRow(query, cardID).Scan(&activityRecordID)
-    if err != nil {
-        if err == sql.ErrNoRows {
-            return 0, fmt.Errorf("ไม่มีกิจกรรมที่ยังไม่เสร็จสิ้นสำหรับผู้ใช้นี้")
-        }
-        log.Printf("Error fetching activityRecord_ID: %v", err)
-        return 0, fmt.Errorf("เกิดข้อผิดพลาดในการดึงข้อมูลกิจกรรม")
-    }
-    return activityRecordID, nil
+	err := db.QueryRow(query, cardID).Scan(&activityRecordID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return 0, fmt.Errorf("ไม่มีกิจกรรมที่ยังไม่เสร็จสิ้นสำหรับผู้ใช้นี้")
+		}
+		log.Printf("Error fetching activityRecord_ID: %v", err)
+		return 0, fmt.Errorf("เกิดข้อผิดพลาดในการดึงข้อมูลกิจกรรม")
+	}
+	return activityRecordID, nil
 }
 
 func UpdateActivityEndTime(db *sql.DB, activity *models.Activityrecord) error {
-    if activity.PatientInfo.PatientInfo_ID == 0 {
-        return fmt.Errorf("patient_info_id is invalid")
-    }
+	if activity.PatientInfo.PatientInfo_ID == 0 {
+		return fmt.Errorf("patient_info_id is invalid")
+	}
 
-    if activity.ActivityRecord_ID == 0 {
-        log.Println("Invalid ActivityRecord_ID")
-        return fmt.Errorf("activity record ID is invalid")
-    }
+	if activity.ActivityRecord_ID == 0 {
+		log.Println("Invalid ActivityRecord_ID")
+		return fmt.Errorf("activity record ID is invalid")
+	}
 
-    query := `
+	query := `
         UPDATE activity_record 
         SET 
             end_time = ?, 
@@ -424,33 +456,31 @@ func UpdateActivityEndTime(db *sql.DB, activity *models.Activityrecord) error {
         WHERE activity_record_id = ? AND end_time IS NULL
     `
 
-    log.Printf("Updating activity_record with: EndTime: %v, EmployeeInfo_ID: %d, WriteBy: %d, ActivityRecord_ID: %d",
-        activity.EndTime,
-        activity.EmployeeInfo.EmployeeInfo_ID,
-        activity.UserInfo.UserInfo_ID,
-        activity.ActivityRecord_ID,
-    )
+	log.Printf("Updating activity_record with: EndTime: %v, EmployeeInfo_ID: %d, WriteBy: %d, ActivityRecord_ID: %d",
+		activity.EndTime,
+		activity.EmployeeInfo.EmployeeInfo_ID,
+		activity.UserInfo.UserInfo_ID,
+		activity.ActivityRecord_ID,
+	)
 
-    result, err := db.Exec(query,
-        activity.EndTime,
-        activity.EmployeeInfo.EmployeeInfo_ID,
-        activity.UserInfo.UserInfo_ID,
-        activity.ActivityRecord_ID,
-    )
+	result, err := db.Exec(query,
+		activity.EndTime,
+		activity.EmployeeInfo.EmployeeInfo_ID,
+		activity.UserInfo.UserInfo_ID,
+		activity.ActivityRecord_ID,
+	)
 
-    if err != nil {
-        log.Printf("SQL Execution error: %v", err)
-        return fmt.Errorf("error updating end time: %v", err)
-    }
+	if err != nil {
+		log.Printf("SQL Execution error: %v", err)
+		return fmt.Errorf("error updating end time: %v", err)
+	}
 
-    rowsAffected, _ := result.RowsAffected()
-    log.Printf("Rows affected: %d", rowsAffected)
+	rowsAffected, _ := result.RowsAffected()
+	log.Printf("Rows affected: %d", rowsAffected)
 
-    if rowsAffected == 0 {
-        return fmt.Errorf("no rows were updated - check your WHERE conditions")
-    }
+	if rowsAffected == 0 {
+		return fmt.Errorf("no rows were updated - check your WHERE conditions")
+	}
 
-    return nil
+	return nil
 }
-
-

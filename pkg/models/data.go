@@ -117,8 +117,9 @@ type WorktimeRecord struct {
 	CreateDate        string       `json:"create_date"`
 	WriteDate         string       `json:"write_date"`
 	EmployeeInfo_ID   int          `json:"employee_info_id"`
-	EmployeeInfo      EmployeeInfo `json:"employee_info"`
-	UserInfo          User_info    `json:"user_info"`
+	EmployeeInfo      *EmployeeInfo `json:"employee_info"`
+	UserInfo          *User_info    `json:"user_info"`
+	User_info_id      int          `json:"user_info_id"`
 	Create_by         string       `json:"create_by"`
 	Write_by          string       `json:"write_by"`
 }
@@ -134,7 +135,6 @@ type User_info struct {
 	EmployeeInfo EmployeeInfo `json:"employee_info"`
 	Create_by    string       `json:"create_by"`
 	Write_by     string       `json:"write_by"`
-	
 }
 
 type LineTokenResponse struct {

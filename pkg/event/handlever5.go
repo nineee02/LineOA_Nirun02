@@ -248,7 +248,11 @@ func handleWorktime(bot *linebot.Client, event *linebot.Event, userID string) {
 		handleworktimeConfirmCheckOut(bot, event, userID)
 
 	default:
-		sendReply(bot, event.ReplyToken, "กรุณาเลือก 'เช็คอิน' หรือ 'เช็คเอ้าท์'")
+		quickReply := linebot.NewQuickReplyItems(
+			linebot.NewQuickReplyButton("", linebot.NewMessageAction("เช็คอิน", "เช็คอิน")),
+			linebot.NewQuickReplyButton("", linebot.NewMessageAction("เช็คเอ้าท์", "เช็คเอ้าท์")),
+		)
+		sendReplyWithQuickReply(bot, event.ReplyToken, "กรุณาเลือก 'เช็คอิน' หรือ 'เช็คเอ้าท์'", quickReply)
 	}
 }
 
@@ -296,9 +300,6 @@ func handleworktimeConfirmCheckIn(bot *linebot.Client, event *linebot.Event, use
 		return
 	}
 
-	// ดึง employee_info_id ที่เกี่ยวข้อง
-	// employeeID := userInfo.EmployeeInfo.EmployeeInfo_ID
-
 	// บันทึกการเช็คอิน
 	err = RecordCheckIn(db, userInfo.UserInfo_ID)
 	if err != nil {
@@ -307,7 +308,19 @@ func handleworktimeConfirmCheckIn(bot *linebot.Client, event *linebot.Event, use
 		return
 	}
 
-	sendReply(bot, event.ReplyToken, fmt.Sprintf("เช็คอินสำเร็จสำหรับ %s", userInfo.Name))
+	// สร้าง worktimeRecord สำหรับ FormatworktimeCheckin
+	worktimeRecord := &models.WorktimeRecord{
+		UserInfo: &models.User_info{
+			Name: userInfo.Name,
+		},
+		CheckIn: time.Now(),
+	}
+
+	// ใช้ FormatworktimeCheckin เพื่อสร้างข้อความตอบกลับ
+	replyMessage := FormatworktimeCheckin(worktimeRecord)
+	sendReply(bot, event.ReplyToken, replyMessage)
+
+	log.Printf("replyMessage checkin success: %s", replyMessage)
 	userState[userID] = "wait status worktimeConfirmCheckOut"
 }
 
@@ -355,7 +368,18 @@ func handleworktimeConfirmCheckOut(bot *linebot.Client, event *linebot.Event, us
 		return
 	}
 
-	sendReply(bot, event.ReplyToken, fmt.Sprintf("เช็คเอ้าท์สำเร็จสำหรับ %s", userInfo.Name))
+	// สร้าง worktimeRecord สำหรับ FormatworktimeCheckout
+	worktimeRecord := &models.WorktimeRecord{
+		UserInfo: &models.User_info{
+			Name: userInfo.Name,
+		},
+		CheckOut: time.Now(),
+	}
+
+	replyMessage := FormatworktimeCheckout(worktimeRecord)
+	sendReply(bot, event.ReplyToken, replyMessage)
+
+	log.Printf("replyMessage checkout success: %s", replyMessage)
 	userState[userID] = "wait status worktimeConfirmCheckIn"
 }
 
@@ -570,6 +594,8 @@ func handleActivityStart(bot *linebot.Client, event *linebot.Event, State string
 	log.Printf("Received activity input(handleActivityStart): %s", starttime)
 
 	if starttime != "เริ่มกิจกรรม" {
+		userState[State] = "wait status Activityrecord"
+		handleActivityrecord(bot, event, State)
 		return
 	}
 
@@ -620,7 +646,6 @@ func handleActivityStart(bot *linebot.Client, event *linebot.Event, State string
 		return
 	}
 
-	// สร้าง activityRecord
 	activityRecord := &models.Activityrecord{
 		PatientInfo: models.PatientInfo{
 			CardID:         cardID,
@@ -631,7 +656,7 @@ func handleActivityStart(bot *linebot.Client, event *linebot.Event, State string
 			Activity: userActivity[State],
 		},
 		EmployeeInfo: models.EmployeeInfo{
-			EmployeeInfo_ID: userInfo.UserInfo_ID, // ใช้ user_info_id แทน employee_id
+			EmployeeInfo_ID: userInfo.UserInfo_ID,
 		},
 		StartTime: time.Now(),
 		UserInfo: models.User_info{
@@ -702,49 +727,49 @@ func handleActivityEnd(bot *linebot.Client, event *linebot.Event, userID string)
 }
 
 func handleSaveavtivityend(bot *linebot.Client, event *linebot.Event, userID string) {
-    if userState[userID] != "wait status Saveavtivityend" {
-        log.Printf("Invalid state for user %s. Current state: %s", userID, userState[userID])
-        return
-    }
+	if userState[userID] != "wait status Saveavtivityend" {
+		log.Printf("Invalid state for user %s. Current state: %s", userID, userState[userID])
+		return
+	}
 
-    // รับชื่อพนักงานจากผู้ใช้
-    employeeName := strings.TrimSpace(event.Message.(*linebot.TextMessage).Text)
-    log.Printf("Received employee name: %s", employeeName)
+	// รับชื่อพนักงานจากผู้ใช้
+	employeeName := strings.TrimSpace(event.Message.(*linebot.TextMessage).Text)
+	log.Printf("Received employee name: %s", employeeName)
 
-    if employeeName == "" {
-        sendReply(bot, event.ReplyToken, "กรุณากรอกชื่อพนักงานที่ให้บริการ.")
-        return
-    }
+	if employeeName == "" {
+		sendReply(bot, event.ReplyToken, "กรุณากรอกชื่อพนักงานที่ให้บริการ.")
+		return
+	}
 
-    // เชื่อมต่อฐานข้อมูล
-    db, err := database.ConnectToDB()
-    if err != nil {
-        log.Printf("Database connection error: %v", err)
-        sendReply(bot, event.ReplyToken, "ไม่สามารถเชื่อมต่อฐานข้อมูลได้ กรุณาลองใหม่")
-        return
-    }
-    defer db.Close()
+	// เชื่อมต่อฐานข้อมูล
+	db, err := database.ConnectToDB()
+	if err != nil {
+		log.Printf("Database connection error: %v", err)
+		sendReply(bot, event.ReplyToken, "ไม่สามารถเชื่อมต่อฐานข้อมูลได้ กรุณาลองใหม่")
+		return
+	}
+	defer db.Close()
 
-    // ใช้ฟังก์ชันแยกเพื่อค้นหา employee_info_id
-    employeeID, err := GetEmployeeIDByName(db, employeeName)
-    if err != nil {
-        sendReply(bot, event.ReplyToken, err.Error())
-        return
-    }
+	// ใช้ฟังก์ชันแยกเพื่อค้นหา employee_info_id
+	employeeID, err := GetEmployeeIDByName(db, employeeName)
+	if err != nil {
+		sendReply(bot, event.ReplyToken, err.Error())
+		return
+	}
 
-    // ตรวจสอบ cardID
-    cardID, exists := usercardidState[userID]
-    if !exists || cardID == "" {
-        sendReply(bot, event.ReplyToken, "ไม่พบข้อมูลบัตรประชาชน กรุณากรอกใหม่")
-        return
-    }
+	// ตรวจสอบ cardID
+	cardID, exists := usercardidState[userID]
+	if !exists || cardID == "" {
+		sendReply(bot, event.ReplyToken, "ไม่พบข้อมูลบัตรประชาชน กรุณากรอกใหม่")
+		return
+	}
 
-    // ดึง activityRecord_ID
-    activityRecordID, err := GetActivityRecordID(db, cardID)
-    if err != nil {
-        sendReply(bot, event.ReplyToken, err.Error())
-        return
-    }
+	// ดึง activityRecord_ID
+	activityRecordID, err := GetActivityRecordID(db, cardID)
+	if err != nil {
+		sendReply(bot, event.ReplyToken, err.Error())
+		return
+	}
 
 	// ดึงข้อมูล userInfo จากฐานข้อมูล
 	userInfo, err := GetUserInfoByLINEID(db, userID)
@@ -762,31 +787,36 @@ func handleSaveavtivityend(bot *linebot.Client, event *linebot.Event, userID str
 		return
 	}
 
-    // บันทึกข้อมูลใน activity_record
-    activityRecord := &models.Activityrecord{
-        ActivityRecord_ID: activityRecordID, // ใช้ ID ที่ดึงมา
-        PatientInfo: models.PatientInfo{
-            CardID:         cardID,
-            PatientInfo_ID: patient.PatientInfo.PatientInfo_ID,
-        },
-        EndTime:      time.Now(),
-        EmployeeInfo: models.EmployeeInfo{EmployeeInfo_ID: employeeID},
-		UserInfo:     models.User_info{UserInfo_ID: userInfo.UserInfo_ID}, // ใช้ userID เป็น write_by
-    }
+	// บันทึกข้อมูลใน activity_record
+	activityRecord := &models.Activityrecord{
+		ActivityRecord_ID: activityRecordID, 
+		PatientInfo: models.PatientInfo{
+			CardID:         cardID,
+			Name:           patient.PatientInfo.Name,
+			PatientInfo_ID: patient.PatientInfo.PatientInfo_ID,
+		},
+		ServiceInfo: models.ServiceInfo{
+			Activity: userActivity[userID],
+		},
+		EndTime:      time.Now(),
+		EmployeeInfo: models.EmployeeInfo{EmployeeInfo_ID: employeeID},
+		UserInfo:     models.User_info{UserInfo_ID: userInfo.UserInfo_ID}, 
+	}
 
-    // log.Println("activityRecord", activityRecord)
+	// บันทึกข้อมูลในฐานข้อมูล
+	if err := UpdateActivityEndTime(db, activityRecord); err != nil {
+		log.Printf("Error updating end time: %v", err)
+		sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการบันทึกเวลาสิ้นสุด กรุณาลองใหม่")
+		return
+	}
 
-    // บันทึกข้อมูลในฐานข้อมูล
-    if err := UpdateActivityEndTime(db, activityRecord); err != nil {
-        log.Printf("Error updating end time: %v", err)
-        sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการบันทึกเวลาสิ้นสุด กรุณาลองใหม่")
-        return
-    }
+	// ใช้ฟังก์ชัน FormatactivityRecordEndtime เพื่อสร้างข้อความตอบกลับ
+	replyMessage := FormatactivityRecordEndtime([]models.Activityrecord{*activityRecord})
+	sendReply(bot, event.ReplyToken, replyMessage)
 
-    sendReply(bot, event.ReplyToken, "บันทึกกิจกรรมสำเร็จ")
-    resetUserState(userID)
+	log.Printf("บันทึกกิจกรรมสำเร็จ: %s", replyMessage)
+	resetUserState(userID)
 }
-
 
 
 
