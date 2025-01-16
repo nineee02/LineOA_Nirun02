@@ -14,7 +14,7 @@ import (
 
 func LineLoginHandler(c *gin.Context) {
 	clientID := "2006767645"
-	redirectURI := "https://7761-110-164-198-113.ngrok-free.app/callback"
+	redirectURI := "https://dc3a-49-237-19-181.ngrok-free.app/callback"
 	state := "random_string"
 	scope := "profile openid email"
 
@@ -70,7 +70,7 @@ func LineLoginCallback(c *gin.Context) {
 const (
 	clientID     = "2006767645"
 	clientSecret = "68fd27f357fe6cc1c6ea782f1cb9819c"
-	redirectURI  = "https://7761-110-164-198-113.ngrok-free.app/callback"
+	redirectURI  = "https://dc3a-49-237-19-181.ngrok-free.app/callback"
 	state        = "random_string"
 	scope        = "profile openid email"
 )
@@ -80,7 +80,7 @@ func exchangeToken(code string) (*models.LineTokenResponse, error) {
 	data := url.Values{
 		"grant_type":    {"authorization_code"},
 		"code":          {code},
-		"redirect_uri":  {"https://7761-110-164-198-113.ngrok-free.app/callback"},
+		"redirect_uri":  {"https://dc3a-49-237-19-181.ngrok-free.app/callback"},
 		"client_id":     {"2006767645"},
 		"client_secret": {"68fd27f357fe6cc1c6ea782f1cb9819c"},
 	}

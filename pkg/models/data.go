@@ -75,7 +75,6 @@ type Activityrecord struct {
 	UserInfo          User_info    `json:"user_info"`
 	Create_by         string       `json:"create_by"`
 	Write_by          string       `json:"write_by"`
-
 	// Location            string              `json:"location"`
 }
 type EmployeeInfo struct {

@@ -33,85 +33,50 @@ func GetUserInfoByLINEID(db *sql.DB, lineUserID string) (*models.User_info, erro
 
 	return user, nil
 }
-func GetWorktimeRecordByUserID(db *sql.DB, userID string) (*models.WorktimeRecord, error) {
-	query := `
-        SELECT 
-            w.worktime_record_id, 
-            w.check_in, 
-            w.check_out, 
-            u.name AS user_name
-        FROM worktime_record w
-        JOIN user_info u ON w.user_info_id = u.user_info_id
-        WHERE u.user_info_id = ? AND w.check_out IS NULL
-    `
-	row := db.QueryRow(query, userID)
+
+func GetWorktimeRecordByUserID(db *sql.DB, UserInfo_ID int) (*models.WorktimeRecord, error) {
+	query := `SELECT
+    w.worktime_record_id,
+    w.check_in,
+    w.check_out,
+    w.period,
+    u.user_name
+FROM worktime_record w
+INNER JOIN user_info u ON w.user_info_id = u.user_info_id
+WHERE u.user_info_id = ?
+ORDER BY w.check_in DESC
+LIMIT 1;`
+
+	row := db.QueryRow(query, UserInfo_ID)
+	log.Println("Executing query:", query)
+	log.Printf("Query parameter userID: %d", UserInfo_ID)
 
 	worktimeRecord := &models.WorktimeRecord{
-		UserInfo:      &models.User_info{},
+		UserInfo: &models.User_info{},
 	}
+
+	// ดึงค่า period เป็น string โดยตรง
 	err := row.Scan(
 		&worktimeRecord.WorktimeRecord_ID,
 		&worktimeRecord.CheckIn,
 		&worktimeRecord.CheckOut,
-		&worktimeRecord.UserInfo.Name,        
+		&worktimeRecord.Period,
+		&worktimeRecord.UserInfo.Name,
 	)
+
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, nil // ไม่มีข้อมูล
+			// กรณีไม่มีข้อมูล
+			log.Println("No worktime record found for userID:", UserInfo_ID)
+			return nil, nil
 		}
+		// กรณีเกิดข้อผิดพลาดอื่น
+		log.Printf("Error scanning row for userID %d: %v", UserInfo_ID, err)
 		return nil, fmt.Errorf("error fetching worktime record: %v", err)
 	}
 
+	log.Printf("Fetched worktime record: %+v", worktimeRecord)
 	return worktimeRecord, nil
-}
-
-
-func GetWorktime(db *sql.DB, employeeCode string) (*models.WorktimeRecord, error) {
-	query := `
-		SELECT wr.worktime_record_id, wr.check_in, wr.check_out, 
-		       e.employee_code, e.username,
-		       d.department, j.job_position
-		FROM worktime_record wr
-		LEFT JOIN employee_info e ON wr.employee_info_id = e.employee_info_id
-		LEFT JOIN department_info d ON e.department_info_id = d.department_info_id
-		LEFT JOIN job_position_info j ON e.job_position_info_id = j.job_position_info_id
-		WHERE e.employee_code = ?
-		ORDER BY wr.check_in DESC
-		LIMIT 1`
-
-	row := db.QueryRow(query, employeeCode)
-
-	var record models.WorktimeRecord
-	var checkOut sql.NullTime
-	var department, jobPosition sql.NullString
-
-	err := row.Scan(
-		&record.WorktimeRecord_ID,
-		&record.CheckIn,
-		&checkOut,
-		&record.EmployeeInfo.EmployeeCode,
-		&record.EmployeeInfo.Name,
-		&department,
-		&jobPosition,
-	)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, nil // คืนค่า nil หากไม่มีข้อมูล
-		}
-		return nil, fmt.Errorf("เกิดข้อผิดพลาดในการดึงข้อมูลการทำงาน: %v", err)
-	}
-
-	// จัดการค่า NULL
-	if checkOut.Valid {
-		record.CheckOut = checkOut.Time // กรณีที่มีค่า
-	} else {
-		record.CheckOut = time.Time{} // กรณีไม่มีค่า
-	}
-
-	record.EmployeeInfo.DepartmentInfo.Department = department.String
-	record.EmployeeInfo.JobPositionInfo.JobPosition = jobPosition.String
-
-	return &record, nil
 }
 
 // ตรวจสอบการเช็คอิน
@@ -269,76 +234,6 @@ func GetPatientInfoByName(db *sql.DB, cardID string) (*models.Activityrecord, er
 	return patient, nil
 }
 
-func GetServiceInfoBycardID(db *sql.DB, cardID string) ([]models.Activityrecord, error) {
-	query := `SELECT a.avtivity_info_id,
-					a.start_time,
-					a.end_time,
-					a.period,
-					p.card_id, 
-					p.username, 
-					p.patient_info_id,
-					s.service_info_id,
-					s.activity
-					e.employee_info_id
-					
-			  FROM activity_record a
-			  INNER JOIN patient_info p ON a.patient_info_id = p.patient_info_id
-			  INNER JOIN service_info s ON a.service_info_id = s.service_info_id
-			  INNER JOIN employee_info e ON a.employee_info_id = e.employee_info_id
-			  WHERE p.card_id =?`
-
-	rows, err := db.Query(query, cardID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var activityrecord []models.Activityrecord
-
-	for rows.Next() {
-		var record models.Activityrecord
-		var patientInfo models.PatientInfo
-		var serviceInfo models.ServiceInfo
-		var employeeInfo models.EmployeeInfo
-
-		err := rows.Scan(
-			&record.ActivityRecord_ID,
-			&record.StartTime,
-			&record.EndTime,
-			&record.Period,
-			&patientInfo.CardID,
-			&patientInfo.Name,
-			&patientInfo.PatientInfo_ID,
-			&serviceInfo.ServiceInfo_ID,
-			&serviceInfo.Activity,
-			&employeeInfo.EmployeeInfo_ID)
-		if err != nil {
-			return nil, err
-		}
-		// Assign ข้อมูลให้กับ Activityrecord
-		record.PatientInfo = patientInfo
-		record.ServiceInfo = serviceInfo
-		record.EmployeeInfo = employeeInfo
-
-		activityrecord = append(activityrecord, record)
-	}
-
-	if len(activityrecord) == 0 {
-		return nil, fmt.Errorf("ไม่พบข้อมูลกิจกรรม: %s", cardID)
-	}
-
-	return activityrecord, nil
-}
-
-func GetServiceInfoIDByActivity(db *sql.DB, activity string) (int, error) {
-	query := "SELECT service_info_id FROM service_info WHERE activity = ?"
-	var serviceInfoID int
-	err := db.QueryRow(query, activity).Scan(&serviceInfoID)
-	if err != nil {
-		return 0, fmt.Errorf("ไม่พบ service_info_id สำหรับกิจกรรม: %s, error: %v", activity, err)
-	}
-	return serviceInfoID, nil
-}
 func GetEmployeeIDByName(db *sql.DB, employeeName string) (int, error) {
 	var employeeID int
 	query := `SELECT employee_info_id FROM employee_info WHERE username = ?`
@@ -352,7 +247,15 @@ func GetEmployeeIDByName(db *sql.DB, employeeName string) (int, error) {
 	}
 	return employeeID, nil
 }
-
+func GetServiceInfoIDByActivity(db *sql.DB, activity string) (int, error) {
+	query := "SELECT service_info_id FROM service_info WHERE activity = ?"
+	var serviceInfoID int
+	err := db.QueryRow(query, activity).Scan(&serviceInfoID)
+	if err != nil {
+		return 0, fmt.Errorf("ไม่พบ service_info_id สำหรับกิจกรรม: %s, error: %v", activity, err)
+	}
+	return serviceInfoID, nil
+}
 func SaveActivityRecord(db *sql.DB, activity *models.Activityrecord) error {
 	// ดึง patient_info_id
 	patient, err := GetPatientInfoByName(db, activity.PatientInfo.CardID)
@@ -361,7 +264,6 @@ func SaveActivityRecord(db *sql.DB, activity *models.Activityrecord) error {
 		return fmt.Errorf("error fetching patient_info_id: %v", err)
 	}
 	activity.PatientInfo.PatientInfo_ID = patient.PatientInfo.PatientInfo_ID
-
 	// ตรวจสอบว่าค่า patient_info_id ถูกต้อง
 	if activity.PatientInfo.PatientInfo_ID == 0 {
 		log.Println("Invalid patient_info_id")
@@ -390,7 +292,7 @@ func SaveActivityRecord(db *sql.DB, activity *models.Activityrecord) error {
 			write_by
 		) 
 		VALUES (?, ?, ?, ?, ?)
-	`
+		`
 	result, err := db.Exec(query,
 		activity.PatientInfo.PatientInfo_ID,
 		serviceInfoID,
@@ -413,10 +315,129 @@ func SaveActivityRecord(db *sql.DB, activity *models.Activityrecord) error {
 	// บันทึก activityRecordID ลงใน activity
 	activity.ActivityRecord_ID = int(activityRecordID)
 
+	log.Printf("TTTTTTTTTTTTTTTTTTT:::::%d", activity.ActivityRecord_ID)
 	log.Println("Activity record saved successfully")
 	return nil
 
 }
+func GetActivityRecordByEmployeeID(db *sql.DB, patientinfoID int) (*models.Activityrecord, error) {
+	query := `SELECT 
+		a.activity_record_id,
+		a.start_time,
+		a.end_time,
+		a.period,
+		a.write_by,
+
+		p.patient_info_id,
+		p.card_id,
+		p.username,
+
+		s.service_info_id,
+		s.activity,
+
+		e.employee_info_id
+	
+	FROM activity_record a
+	INNER JOIN patient_info p ON a.patient_info_id = p.patient_info_id
+	INNER JOIN service_info s ON a.service_info_id = s.service_info_id
+	INNER JOIN employee_info e ON a.employee_info_id = e.employee_info_id
+	WHERE e.employee_info_id = ? 
+	ORDER BY a.start_time DESC 
+	LIMIT 1;`
+
+	row := db.QueryRow(query, patientinfoID)
+
+	var record models.Activityrecord
+	var patientInfo models.PatientInfo
+	var serviceInfo models.ServiceInfo
+	var employeeInfo models.EmployeeInfo
+
+	err := row.Scan(
+		&record.ActivityRecord_ID,
+		&record.StartTime,
+		&record.EndTime,
+		&record.Period,
+		&record.Write_by,
+
+		&patientInfo.PatientInfo_ID,
+		&patientInfo.CardID,
+		&patientInfo.Name,
+
+		&serviceInfo.ServiceInfo_ID,
+		&serviceInfo.Activity,
+
+		&employeeInfo.EmployeeInfo_ID,
+	)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			// กรณีไม่พบข้อมูล
+			return nil, fmt.Errorf("ไม่พบข้อมูลกิจกรรมที่ยังไม่เสร็จสำหรับ employeeID: %s", patientinfoID)
+		}
+		// กรณีเกิดข้อผิดพลาด
+		return nil, fmt.Errorf("เกิดข้อผิดพลาดในการดึงข้อมูลกิจกรรม: %v", err)
+	}
+
+	// Assign ข้อมูลให้กับ Activityrecord
+	record.PatientInfo = patientInfo
+	record.ServiceInfo = serviceInfo
+	record.EmployeeInfo = employeeInfo
+
+	return &record, nil
+}
+
+func UpdateActivityEndTimeForPatient(db *sql.DB, activity *models.Activityrecord) error {
+	if activity.PatientInfo.PatientInfo_ID == 0 {
+		return fmt.Errorf("invalid patient_info_id")
+	}
+
+	if activity.ActivityRecord_ID == 0 {
+		log.Println("Invalid ActivityRecord_ID")
+		return fmt.Errorf("invalid activity record ID")
+	}
+
+	query := `
+        UPDATE activity_record 
+        SET 
+            end_time = ?, 
+            employee_info_id = ?, 
+            write_by = ?, 
+            write_date = NOW()
+        WHERE activity_record_id = ? 
+          AND patient_info_id = ? 
+          AND end_time IS NULL
+    `
+	log.Printf("Updating activity_record with: EndTime=%v, EmployeeInfo_ID=%d, WriteBy=%d, ActivityRecord_ID=%d, PatientInfo_ID=%d",
+		activity.EndTime,
+		activity.EmployeeInfo.EmployeeInfo_ID,
+		activity.UserInfo.UserInfo_ID,
+		activity.ActivityRecord_ID,
+		activity.PatientInfo.PatientInfo_ID,
+	)
+
+	result, err := db.Exec(query,
+		activity.EndTime,
+		activity.EmployeeInfo.EmployeeInfo_ID,
+		activity.UserInfo.UserInfo_ID,
+		activity.ActivityRecord_ID,
+		activity.PatientInfo.PatientInfo_ID,
+	)
+
+	if err != nil {
+		log.Printf("SQL Execution error: %v", err)
+		return fmt.Errorf("error updating activity record: %v", err)
+	}
+
+	rowsAffected, _ := result.RowsAffected()
+	log.Printf("Rows affected: %d", rowsAffected)
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("no rows were updated - check your WHERE conditions")
+	}
+
+	return nil
+}
+
 func GetActivityRecordID(db *sql.DB, cardID string) (int, error) {
 	var activityRecordID int
 	query := `
@@ -483,4 +504,26 @@ func UpdateActivityEndTime(db *sql.DB, activity *models.Activityrecord) error {
 	}
 
 	return nil
+}
+func GetActivityStartTime(db *sql.DB, cardID string, activity string) (time.Time, error) {
+	// คิวรีเพื่อดึง start_time จาก activity_record โดยใช้ cardID และ activity
+	query := `
+		SELECT a.start_time
+		FROM activity_record a
+		INNER JOIN patient_info p ON a.patient_info_id = p.patient_info_id
+		INNER JOIN service_info s ON a.service_info_id = s.service_info_id
+		WHERE p.card_id = ? AND s.activity = ? AND a.end_time IS NULL
+		LIMIT 1
+	`
+
+	var startTime time.Time
+	err := db.QueryRow(query, cardID, activity).Scan(&startTime)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return time.Time{}, fmt.Errorf("ไม่พบเวลาเริ่มสำหรับ card_id: %s และกิจกรรม: %s", cardID, activity)
+		}
+		return time.Time{}, fmt.Errorf("เกิดข้อผิดพลาดในการดึงเวลาเริ่ม: %v", err)
+	}
+
+	return startTime, nil
 }

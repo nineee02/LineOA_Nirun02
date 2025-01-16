@@ -34,9 +34,11 @@ func FormatworktimeCheckin(worktimeRecord *models.WorktimeRecord) string {
 // }
 
 func FormatworktimeCheckout(worktimeRecord *models.WorktimeRecord) string {
-	return fmt.Sprintf("--ลาก่อน--\n\n%s\nเช็คเอ้าท์ที่: %s",
+	return fmt.Sprintf("--ลาก่อน--\n\n%s\nเช็คเอ้าท์ที่: %s\n%s",
 		worktimeRecord.UserInfo.Name,
+		worktimeRecord.Period,
 		worktimeRecord.CheckOut.Format("2006-01-02 15:04:05 PM"))
+
 }
 
 func FormatPatientInfo(patient *models.Activityrecord) string {
@@ -89,10 +91,11 @@ func FormatactivityRecordEndtime(endtime []models.Activityrecord) string {
 	var result string
 	for _, record := range endtime {
 		result += fmt.Sprintf(
-			"บันทึกกิจกรรม: %s\nของ %s\nที่: %s\n\n!!!สำเร็จ!!!",
+			"บันทึกกิจกรรม: %s\nของ %s\nที่: %s\n%s\n!!!สำเร็จ!!!",
 			record.ServiceInfo.Activity,
 			record.PatientInfo.Name,
 			record.EndTime.Format("2006-01-02 15:04:05 PM"),
+			record.Period,
 		)
 	}
 	return result
