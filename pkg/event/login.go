@@ -1,6 +1,7 @@
 package event
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -54,12 +55,20 @@ func LineLoginCallback(c *gin.Context) {
 
 	log.Printf("User Profile: %+v", profile)
 
-	// บันทึกข้อมูลผู้ใช้ลงในฐานข้อมูล
-	// err = saveUserToDatabase(profile.UserID, profile.DisplayName, profile.Email)
+	db, err := sql.Open("mysql", "user:password@tcp(127.0.0.1:3306)/your_database")
+	if err != nil {
+		log.Printf("Failed to connect to database: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to connect to database"})
+		return
+	}
+	defer db.Close()
+
+	// // บันทึกข้อมูลผู้ใช้ลงในฐานข้อมูล
+	// err = SaveUserToDatabase(db, profile.UserID, profile.DisplayName)
 	// if err != nil {
-	//     c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save user"})
-	//     log.Printf("Error saving user to database: %v", err)
-	//     return
+	// 	c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save user"})
+	// 	log.Printf("Error saving user to database: %v", err)
+	// 	return
 	// }
 
 	// Redirect ไปยังหน้าการเพิ่มเพื่อนหลังจากบันทึกสำเร็จ

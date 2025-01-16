@@ -8,6 +8,7 @@ import (
 	"time"
 )
 
+
 func GetUserInfoByLINEID(db *sql.DB, lineUserID string) (*models.User_info, error) {
 	query := `SELECT user_info_id, line_user_id, sex, name, email, phone_number, create_date, write_date 
 	          FROM user_info WHERE line_user_id = ?`
