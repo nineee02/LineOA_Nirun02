@@ -1,7 +1,8 @@
 package main
 
 import (
-	"log" // ถ้าฟังก์ชัน HandleLineWebhook อยู่ใน pkg/hook
+	// ถ้าฟังก์ชัน HandleLineWebhook อยู่ใน pkg/hook
+	"log"
 	"nirun/pkg/event"
 	"nirun/pkg/hook"
 	"nirun/pkg/linebot"
@@ -11,7 +12,7 @@ import (
 )
 
 func generateQRCode() {
-	url := "https://access.line.me/oauth2/v2.1/authorize?response_type=code&client_id=2006767645&redirect_uri=https://dc3a-49-237-19-181.ngrok-free.app/callback&state=random_string&scope=profile%20openid%20email"
+	url := "https://access.line.me/oauth2/v2.1/authorize?response_type=code&client_id=2006767645&redirect_uri=http%3A%2F%2Fcommunity.app.nirun.life%2Fauth_oauth%2Fsignin&state=random_string&scope=profile%20openid%20email"
 	err := qrcode.WriteFile(url, qrcode.Medium, 256, "qrcode_line_login.png")
 	if err != nil {
 		log.Fatalf("Failed to generate QR Code: %v", err)

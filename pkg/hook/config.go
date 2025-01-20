@@ -26,10 +26,15 @@ func HandleLineWebhook(c *gin.Context) {
 
 	for _, lineEvent := range events {
 		if lineEvent.Type == linebot.EventTypeMessage {
-			message, ok := lineEvent.Message.(*linebot.TextMessage)
-			if ok {
-				log.Printf("Received message: %s", message.Text)
+			switch message := lineEvent.Message.(type) {
+			case *linebot.TextMessage:
+				log.Printf("Received TextMessage: %s", message.Text)
 				event.HandleEvent(bot, lineEvent)
+			case *linebot.ImageMessage:
+				log.Printf("Received ImageMessage: ID=%s", message.ID)
+				event.HandleEvent(bot, lineEvent)
+			default:
+				log.Printf("Unhandled message type: %T", message)
 			}
 		}
 	}

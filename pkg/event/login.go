@@ -13,16 +13,19 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func LineLoginHandler(c *gin.Context) {
-	clientID := "2006767645"
-	redirectURI := "https://dc3a-49-237-19-181.ngrok-free.app/callback"
-	state := "random_string"
-	scope := "profile openid email"
+const (
+	clientID     = "2006767645"
+	clientSecret = "68fd27f357fe6cc1c6ea782f1cb9819c"
+	redirectURI  = "http://community.app.nirun.life/auth_oauth/signin"
+	state        = "random_string"
+	scope        = "profile openid email"
+)
 
-	// สร้าง URL สำหรับ Line Login
+// LineLoginHandler สร้าง URL สำหรับ Line Login และ Redirect ผู้ใช้
+func LineLoginHandler(c *gin.Context) {
 	lineLoginURL := fmt.Sprintf(
 		"https://access.line.me/oauth2/v2.1/authorize?response_type=code&client_id=%s&redirect_uri=%s&state=%s&scope=%s",
-		clientID, redirectURI, state, scope,
+		clientID, url.QueryEscape(redirectURI), state, url.QueryEscape(scope),
 	)
 	log.Println("Line Login URL:", lineLoginURL)
 
@@ -30,6 +33,7 @@ func LineLoginHandler(c *gin.Context) {
 	c.Redirect(http.StatusFound, lineLoginURL)
 }
 
+// LineLoginCallback
 func LineLoginCallback(c *gin.Context) {
 	code := c.Query("code")
 	if code == "" {
@@ -55,6 +59,7 @@ func LineLoginCallback(c *gin.Context) {
 
 	log.Printf("User Profile: %+v", profile)
 
+	// เชื่อมต่อกับฐานข้อมูล
 	db, err := sql.Open("mysql", "user:password@tcp(127.0.0.1:3306)/your_database")
 	if err != nil {
 		log.Printf("Failed to connect to database: %v", err)
@@ -63,35 +68,27 @@ func LineLoginCallback(c *gin.Context) {
 	}
 	defer db.Close()
 
-	// // บันทึกข้อมูลผู้ใช้ลงในฐานข้อมูล
-	// err = SaveUserToDatabase(db, profile.UserID, profile.DisplayName)
+	// // บันทึกข้อมูลผู้ใช้ลงในฐานข้อมูล (สามารถเปิดใช้งานได้เมื่อมีฟังก์ชัน SaveUserToDatabase)
+	// err = SaveUserToDatabase(db, profile.UserID, profile.DisplayName, profile.Email)
 	// if err != nil {
 	// 	c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save user"})
 	// 	log.Printf("Error saving user to database: %v", err)
 	// 	return
 	// }
 
-	// Redirect ไปยังหน้าการเพิ่มเพื่อนหลังจากบันทึกสำเร็จ
+	// Redirect ไปยังหน้าการเพิ่มเพื่อน
 	addFriendURL := "https://line.me/R/ti/p//@392avxhp"
 	c.Redirect(http.StatusFound, addFriendURL)
 }
-
-const (
-	clientID     = "2006767645"
-	clientSecret = "68fd27f357fe6cc1c6ea782f1cb9819c"
-	redirectURI  = "https://dc3a-49-237-19-181.ngrok-free.app/callback"
-	state        = "random_string"
-	scope        = "profile openid email"
-)
 
 // ฟังก์ชันแลกเปลี่ยน Token
 func exchangeToken(code string) (*models.LineTokenResponse, error) {
 	data := url.Values{
 		"grant_type":    {"authorization_code"},
 		"code":          {code},
-		"redirect_uri":  {"https://dc3a-49-237-19-181.ngrok-free.app/callback"},
-		"client_id":     {"2006767645"},
-		"client_secret": {"68fd27f357fe6cc1c6ea782f1cb9819c"},
+		"redirect_uri":  {redirectURI},
+		"client_id":     {clientID},
+		"client_secret": {clientSecret},
 	}
 
 	resp, err := http.PostForm("https://api.line.me/oauth2/v2.1/token", data)
