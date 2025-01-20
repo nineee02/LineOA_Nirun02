@@ -3,11 +3,13 @@ package database
 import (
 	"database/sql"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"nirun/pkg/models"
+	"os"
 
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/credentials"
 	"gopkg.in/yaml.v2"
 )
 
@@ -15,7 +17,7 @@ import (
 func ConnectToDB() (*sql.DB, error) {
 	// โหลด config จากไฟล์ config.yaml
 	var config models.Config
-	data, err := ioutil.ReadFile("config.yaml")
+	data, err := os.ReadFile("config.yaml")
 	if err != nil {
 		log.Fatal("Error reading config file:", err)
 		return nil, err
@@ -47,7 +49,7 @@ func LoadConfig() (models.Config, error) {
 	var config models.Config
 
 	// อ่านไฟล์ config.yaml
-	data, err := ioutil.ReadFile("config.yaml")
+	data, err := os.ReadFile("config.yaml")
 	if err != nil {
 		log.Println("Error reading config file:", err)
 		return config, err
@@ -61,4 +63,26 @@ func LoadConfig() (models.Config, error) {
 	}
 
 	return config, nil
+}
+
+func ConnectToMinio() (*minio.Client, error) {
+	// โหลดค่าการตั้งค่าจาก config.yaml
+	config, err := LoadConfig()
+	if err != nil {
+		log.Println("Error loading config for MinIO:", err)
+		return nil, err
+	}
+
+	// สร้าง MinIO client
+	minioClient, err := minio.New(config.Minio.Endpoint, &minio.Options{
+		Creds:  credentials.NewStaticV4(config.Minio.AccessKey, config.Minio.SecretKey, ""),
+		Secure: config.Minio.UseSSL,
+	})
+	if err != nil {
+		log.Println("Error connecting to MinIO:", err)
+		return nil, err
+	}
+	log.Printf("MinIO Credentials Loaded: AccessKey=%s, SecretKey=%s", config.Minio.AccessKey, config.Minio.SecretKey)
+	log.Println("Successfully connected to MinIO")
+	return minioClient, nil
 }

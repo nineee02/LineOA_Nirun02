@@ -1,13 +1,16 @@
 package event
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"log"
+	"nirun/pkg/database"
 	"nirun/pkg/models"
 	"time"
-)
 
+	"github.com/minio/minio-go/v7"
+)
 
 func GetUserInfoByLINEID(db *sql.DB, lineUserID string) (*models.User_info, error) {
 	query := `SELECT user_info_id, line_user_id, sex, name, email, phone_number, create_date, write_date 
@@ -165,6 +168,7 @@ func RecordCheckOut(db *sql.DB, userID int) error {
 func GetPatientInfoByName(db *sql.DB, cardID string) (*models.Activityrecord, error) {
 	query := `SELECT 
 				p.card_id,
+				p.image,
 				p.patient_info_id,
 				p.username, 
 				p.phone_number, 
@@ -194,11 +198,15 @@ func GetPatientInfoByName(db *sql.DB, cardID string) (*models.Activityrecord, er
 			LEFT JOIN country_info c ON p.country_info_id = c.country_info_id
 			LEFT JOIN religion_info r ON p.religion_info_id = r.religion_info_id
 			LEFT JOIN right_to_treatment_info rtt ON p.right_to_treatment_info_id = rtt.right_to_treatment_info_id 
-			WHERE p.card_id LIKE ?`
+			WHERE p.card_id = ?`
 
+	// สร้างโครงสร้างเพื่อเก็บผลลัพธ์
 	patient := &models.Activityrecord{}
-	err := db.QueryRow(query, "%"+cardID+"%").Scan(
+	var imagePath []byte
+
+	err := db.QueryRow(query, cardID).Scan(
 		&patient.PatientInfo.CardID,
+		&imagePath,
 		&patient.PatientInfo.PatientInfo_ID,
 		&patient.PatientInfo.Name,
 		&patient.PatientInfo.PhoneNumber,
@@ -227,10 +235,13 @@ func GetPatientInfoByName(db *sql.DB, cardID string) (*models.Activityrecord, er
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("ไม่พบข้อมูลผู้สูงอายุ")
+			return nil, fmt.Errorf("ไม่พบข้อมูลผู้ป่วยที่มี CardID: %s", cardID)
 		}
-		return nil, fmt.Errorf("เกิดข้อผิดพลาด: %v", err)
+		return nil, fmt.Errorf("เกิดข้อผิดพลาดในการดึงข้อมูลผู้ป่วย: %v", err)
 	}
+
+	// แปลง imagePath จาก []byte เป็น string และเก็บในโครงสร้าง
+	patient.PatientInfo.ImagePath = string(imagePath)
 
 	return patient, nil
 }
@@ -507,7 +518,6 @@ func UpdateActivityEndTime(db *sql.DB, activity *models.Activityrecord) error {
 	return nil
 }
 func GetActivityStartTime(db *sql.DB, cardID string, activity string) (time.Time, error) {
-	// คิวรีเพื่อดึง start_time จาก activity_record โดยใช้ cardID และ activity
 	query := `
 		SELECT a.start_time
 		FROM activity_record a
@@ -527,4 +537,41 @@ func GetActivityStartTime(db *sql.DB, cardID string, activity string) (time.Time
 	}
 
 	return startTime, nil
+}
+
+func GetImageFromDatabase(db *sql.DB, cardID string) ([]byte, error) {
+	var imageData []byte
+	query := "SELECT image FROM patient_info WHERE card_id = ?"
+	err := db.QueryRow(query, cardID).Scan(&imageData)
+	if err != nil {
+		return nil, fmt.Errorf("ไม่พบข้อมูลรูปภาพสำหรับ CardID: %s, Error: %v", cardID, err)
+	}
+
+	return imageData, nil
+}
+
+func UploadFileToMinIO(minioClient *minio.Client, bucketName, objectName, filePath string) (string, error) {
+	// โหลด config จาก database.LoadConfig
+	config, err := database.LoadConfig()
+	if err != nil {
+		return "", fmt.Errorf("failed to load config: %w", err)
+	}
+
+	// อัปโหลดไฟล์ไปยัง MinIO
+	_, err = minioClient.FPutObject(
+		context.Background(),
+		bucketName,
+		objectName,
+		filePath,
+		minio.PutObjectOptions{},
+	)
+	if err != nil {
+		return "", fmt.Errorf("failed to upload file to MinIO: %w", err)
+	}
+
+	// สร้าง URL ของไฟล์
+	fileURL := fmt.Sprintf("https://%s/%s/%s", config.Minio.Endpoint, bucketName, objectName)
+	log.Println("File uploaded successfully to MinIO. URL:", fileURL)
+
+	return fileURL, nil
 }

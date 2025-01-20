@@ -4,6 +4,8 @@ import "time"
 
 type PatientInfo struct {
 	PatientInfo_ID       int                  `json:"patient_info_id"`
+	Image                []byte               `json:"image"`
+	ImagePath            string               `json:"image_path"`
 	CardID               string               `json:"card_id"`
 	Name                 string               `json:"username"`
 	PhoneNumber          string               `json:"phone_number"`
@@ -109,18 +111,18 @@ type JobPositionInfo struct {
 }
 
 type WorktimeRecord struct {
-	WorktimeRecord_ID int          `json:"worktime_record_id"`
-	CheckIn           time.Time    `json:"check_in"`
-	CheckOut          time.Time    `json:"check_out"`
-	Period            string       `json:"period"`
-	CreateDate        string       `json:"create_date"`
-	WriteDate         string       `json:"write_date"`
-	EmployeeInfo_ID   int          `json:"employee_info_id"`
+	WorktimeRecord_ID int           `json:"worktime_record_id"`
+	CheckIn           time.Time     `json:"check_in"`
+	CheckOut          time.Time     `json:"check_out"`
+	Period            string        `json:"period"`
+	CreateDate        string        `json:"create_date"`
+	WriteDate         string        `json:"write_date"`
+	EmployeeInfo_ID   int           `json:"employee_info_id"`
 	EmployeeInfo      *EmployeeInfo `json:"employee_info"`
 	UserInfo          *User_info    `json:"user_info"`
-	User_info_id      int          `json:"user_info_id"`
-	Create_by         string       `json:"create_by"`
-	Write_by          string       `json:"write_by"`
+	User_info_id      int           `json:"user_info_id"`
+	Create_by         string        `json:"create_by"`
+	Write_by          string        `json:"write_by"`
 }
 type User_info struct {
 	UserInfo_ID  int          `json:"user_info_id"`

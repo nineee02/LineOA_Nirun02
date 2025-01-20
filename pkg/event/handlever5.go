@@ -7,6 +7,7 @@ import (
 	"nirun/pkg/database"
 	"nirun/pkg/flexmessage"
 	"nirun/pkg/models"
+	"os"
 	"strings"
 	"time"
 
@@ -33,6 +34,8 @@ func HandleEvent(bot *linebot.Client, event *linebot.Event) {
 		handleWorktimeStste(bot, event, event.Source.UserID)
 	case "บันทึกกิจกรรม":
 		handleServiceRecordStste(bot, event, event.Source.UserID)
+	// case "Test":
+	// 	handleTestminio(bot, event, event.Source.UserID)
 	default:
 		handleDefault(bot, event)
 	}
@@ -58,6 +61,8 @@ func HandleEvent(bot *linebot.Client, event *linebot.Event) {
 			handleActivityEnd(bot, event, State)
 		case "wait status Saveavtivityend":
 			handleSaveavtivityend(bot, event, State)
+		// case "Test":
+		// 	handleTest(bot, event, State)
 		default:
 			log.Printf("Unhandled state for user %s: %s", State, State)
 		}
@@ -88,7 +93,18 @@ func handleElderlyInfoStste(bot *linebot.Client, event *linebot.Event, State str
 	// อนุญาตให้ดำเนินการ
 	setUserState(State, "wait status ElderlyInfoRequest")
 }
+func handleTestminio(bot *linebot.Client, event *linebot.Event, State string) {
+	userID := event.Source.UserID
 
+	// ตรวจสอบสถานะการเช็คอินของบัญชี LINE
+	if isUserCheckedIn(userID) {
+		sendReply(bot, event.ReplyToken, "คุณได้เช็คอินอยู่แล้ว กรุณาเช็คเอาท์ก่อนทำการเช็คอินใหม่")
+		return
+	}
+
+	// อนุญาตให้ดำเนินการ
+	setUserState(State, "Test")
+}
 func handleServiceRecordStste(bot *linebot.Client, event *linebot.Event, State string) {
 	userID := event.Source.UserID
 
@@ -231,11 +247,20 @@ func handleWorktime(bot *linebot.Client, event *linebot.Event, userID string) {
 		handleworktimeConfirmCheckOut(bot, event, userID)
 
 	default:
-		quickReply := linebot.NewQuickReplyItems(
-			linebot.NewQuickReplyButton("", linebot.NewMessageAction("เช็คอิน", "เช็คอิน")),
-			linebot.NewQuickReplyButton("", linebot.NewMessageAction("เช็คเอ้าท์", "เช็คเอ้าท์")),
-		)
-		sendReplyWithQuickReply(bot, event.ReplyToken, "กรุณาเลือก 'เช็คอิน' หรือ 'เช็คเอ้าท์'", quickReply)
+		worktimeRecord := &models.WorktimeRecord{
+			UserInfo: &models.User_info{
+				Name: userInfo.Name,
+			},
+			CheckIn:  time.Now(),  // สามารถปรับข้อมูลจริงจากฐานข้อมูลได้
+			CheckOut: time.Time{}, // ค่า CheckOut จะเป็นเวลาเริ่มต้น
+		}
+
+		// ใช้ Flex Message
+		flexMessage := flexmessage.FormatConfirmationWorktime(worktimeRecord)
+		if _, err := bot.ReplyMessage(event.ReplyToken, flexMessage).Do(); err != nil {
+			log.Printf("Error sending Flex Message: %v", err)
+			sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการส่งข้อความ กรุณาลองใหม่.")
+		}
 	}
 }
 
@@ -415,7 +440,6 @@ func resetUserState(userID string) {
 }
 
 func handlePateintInfo(bot *linebot.Client, event *linebot.Event, userID string) {
-
 	state, exists := getUserState(userID)
 	if !exists || state != "wait status ElderlyInfoRequest" {
 		log.Printf("Invalid state for user %s. Current state: %s", userID, state)
@@ -423,16 +447,8 @@ func handlePateintInfo(bot *linebot.Client, event *linebot.Event, userID string)
 		return
 	}
 
-	// // ป้องกันการประมวลผลซ้ำ
-	// if userActivity[userID] == "processing" {
-	// 	sendReply(bot, event.ReplyToken, "คำขอของคุณกำลังดำเนินการ กรุณารอสักครู่.")
-	// 	return
-	// }
-	// userActivity[userID] = "processing"
-	// defer func() { userActivity[userID] = "" }() // รีเซ็ตสถานะเมื่อเสร็จสิ้น
-
 	// ดึงข้อความที่ผู้ใช้ส่งมา
-	message := event.Message.(*linebot.TextMessage).Text
+	message := strings.TrimSpace(event.Message.(*linebot.TextMessage).Text)
 
 	db, err := database.ConnectToDB()
 	if err != nil {
@@ -442,36 +458,80 @@ func handlePateintInfo(bot *linebot.Client, event *linebot.Event, userID string)
 	}
 	defer db.Close()
 
-	// หากผู้ใช้ส่งข้อความ "ข้อมูลผู้สูงอายุ"
-	if strings.TrimSpace(message) == "ค้นหาข้อมูล" {
-		sendReply(bot, event.ReplyToken, "กรุณากรอกเลขบัตรประชาชน 13หลักของผู้เข้ารับบริการ\nตัวอย่างเช่น 1234567891234 :")
+	// หากผู้ใช้ส่งข้อความ "ค้นหาข้อมูล"
+	if message == "ค้นหาข้อมูล" {
+		sendReply(bot, event.ReplyToken, "กรุณากรอกเลขบัตรประชาชน 13 หลักของผู้เข้ารับบริการ\nตัวอย่างเช่น 1234567891234 :")
 		return
 	}
 
 	// ตรวจสอบเลขประจำตัวประชาชน (cardID)
-	cardID := strings.TrimSpace(message)
-	if cardID == "" {
-		sendReply(bot, event.ReplyToken, "กรุณากรอกเลขบัตรประชาชน 13หลักของผู้เข้ารับบริการ\nตัวอย่างเช่น 1234567891234 :")
+	cardID := message
+	if len(cardID) != 13 {
+		sendReply(bot, event.ReplyToken, "กรุณากรอกเลขบัตรประชาชน 13 หลักที่ถูกต้อง\nตัวอย่างเช่น 1234567891234 :")
 		return
 	}
 	log.Println("เลขประจำตัวประชาชน:", cardID)
 
-	// ค้นหาข้อมูลผู้ป่วยจากฐานข้อมูล
+	// ดึงข้อมูลผู้ป่วยจาก CardID
 	patient, err := GetPatientInfoByName(db, cardID)
 	if err != nil {
-		if err == sql.ErrNoRows {
-			sendReply(bot, event.ReplyToken, "ไม่พบข้อมูลผู้ป่วยที่ท่านค้นหา กรุณาตรวจสอบเลขประจำตัวผู้ป่วยอีกครั้ง.")
-		} else {
-			log.Println("Error fetching patient info:", err)
-			sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการค้นหาข้อมูลผู้ป่วย กรุณาลองใหม่.")
-		}
+		log.Println("Error fetching patient info:", err)
+		sendReply(bot, event.ReplyToken, "ไม่พบข้อมูลผู้ป่วย กรุณาตรวจสอบเลขประจำตัวประชาชนอีกครั้ง")
 		return
 	}
 
-	replyMessage := FormatPatientInfo(patient)
-	sendReply(bot, event.ReplyToken, replyMessage)
+	// ดึงข้อมูลรูปภาพจากฐานข้อมูล
+	imageData, err := GetImageFromDatabase(db, cardID)
+	if err != nil {
+		log.Println("Error fetching image from database:", err)
+		sendReply(bot, event.ReplyToken, "ไม่พบรูปภาพสำหรับผู้ป่วย กรุณาลองใหม่.")
+		return
+	}
+	log.Printf("inmageData: %+v", imageData)
 
-	// รีเซ็ตสถานะผู้ใช้
+	// บันทึกภาพเป็นไฟล์ชั่วคราว
+	tempDir := os.TempDir() // ดึงตำแหน่ง temporary directory
+	if _, err := os.Stat(tempDir); os.IsNotExist(err) {
+		err = os.MkdirAll(tempDir, os.ModePerm)
+		if err != nil {
+			log.Println("Error creating temp directory:", err)
+			sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการสร้างไดเรกทอรีชั่วคราว")
+			return
+		}
+	}
+	tempFilePath := fmt.Sprintf("%s\\%s.jpg", tempDir, cardID)
+	err = os.WriteFile(tempFilePath, imageData, 0644)
+	if err != nil {
+		log.Println("Error writing image file:", err)
+		sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการจัดการรูปภาพ")
+		return
+	}
+	defer os.Remove(tempFilePath) // ลบไฟล์หลังใช้งาน
+
+	// เชื่อมต่อ MinIO และอัปโหลดรูปภาพ
+	minioClient, err := database.ConnectToMinio()
+	if err != nil {
+		log.Println("Error connecting to MinIO:", err)
+		sendReply(bot, event.ReplyToken, "ไม่สามารถเชื่อมต่อ MinIO ได้")
+		return
+	}
+	objectName := fmt.Sprintf("patient_info/%d/%s.jpg", patient.PatientInfo.PatientInfo_ID, cardID)
+	bucketName := "nirunimages" // แทนที่ด้วยชื่อ bucket ของคุณ
+
+	fileURL, err := UploadFileToMinIO(minioClient, bucketName, objectName, tempFilePath)
+	if err != nil {
+		log.Println("Error uploading file to MinIO:", err)
+		sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการอัปโหลดรูปภาพไปยัง MinIO")
+		return
+	}
+	log.Printf("fileURL: %s", fileURL)
+
+	flexMessage := flexmessage.FormatPatientInfo(patient)
+	if _, err := bot.PushMessage(userID, flexMessage).Do(); err != nil {
+		log.Println("Error sending push message:", err)
+	}
+
+	log.Println("ข้อมูลผู้ป่วยและรูปภาพส่งสำเร็จ:", flexMessage)
 	userState[userID] = ""
 }
 
@@ -539,17 +599,11 @@ func handleServiceInfo(bot *linebot.Client, event *linebot.Event, State string) 
 		return
 	}
 
-	replyMessage := FormatServiceInfo([]models.Activityrecord{*service})
-	log.Println("ข้อมูลผู้สูงอายุ :", replyMessage)
-
-	// สร้าง Quick Reply สำหรับกิจกรรม
-	quickReplyActivities := createQuickReplyActivities()
-	if _, err := bot.ReplyMessage(
-		event.ReplyToken,
-		linebot.NewTextMessage(replyMessage).WithQuickReplies(&quickReplyActivities),
-	).Do(); err != nil {
-		log.Printf("Error replying message (handleServiceInfo): %v", err)
+	flexMessage := flexmessage.FormatServiceInfo([]models.Activityrecord{*service})
+	if _, err := bot.ReplyMessage(event.ReplyToken, flexMessage).Do(); err != nil {
+		log.Printf("Error sending Flex Message (handleServiceInfo): %v", err)
 		sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการส่งข้อความ กรุณาลองใหม่.")
+		return
 	}
 
 	// บันทึก cardID สำหรับใช้ในฟังก์ชันถัดไป
@@ -588,12 +642,13 @@ func handleActivityrecord(bot *linebot.Client, event *linebot.Event, State strin
 	userActivity[State] = activity
 	log.Printf("Stored activity for user %s: %s", State, activity)
 
-	// สร้าง Quick Reply สำหรับเริ่มกิจกรรม
-	quickReply := linebot.NewQuickReplyItems(
-		linebot.NewQuickReplyButton("", linebot.NewMessageAction("เริ่มกิจกรรม", "เริ่มกิจกรรม")),
-	)
+	// ใช้ Flex Message แทน Quick Reply
+	flexContainer := flexmessage.FormatStartActivity(activity)
+	flexMessage := linebot.NewFlexMessage("เริ่มกิจกรรม", flexContainer)
 
-	sendReplyWithQuickReply(bot, event.ReplyToken, "กรุณากดปุ่ม 'เริ่มกิจกรรม' เพื่อเริ่มบันทึกเวลา", quickReply)
+	if _, err := bot.ReplyMessage(event.ReplyToken, flexMessage).Do(); err != nil {
+		log.Printf("Error sending Flex Message: %v", err)
+	}
 
 	// อัปเดตสถานะผู้ใช้
 	userState[State] = "wait status ActivityStart"
@@ -698,17 +753,10 @@ func handleActivityStart(bot *linebot.Client, event *linebot.Event, State string
 	}
 
 	activityRecord.PatientInfo.Name = patient.PatientInfo.Name
-	replyMessage := FormatactivityRecordStarttime([]models.Activityrecord{*activityRecord})
+	flexMessage := flexmessage.FormatactivityRecordStarttime(activityRecord)
 
-	quickReply := linebot.NewQuickReplyItems(
-		linebot.NewQuickReplyButton("", linebot.NewMessageAction("เสร็จสิ้น", "เสร็จสิ้น")),
-	)
-	_, err = bot.ReplyMessage(
-		event.ReplyToken,
-		linebot.NewTextMessage(replyMessage).WithQuickReplies(quickReply),
-	).Do()
-	if err != nil {
-		log.Println("Error sending Quick Reply (handleActivityStart):", err)
+	if _, err := bot.ReplyMessage(event.ReplyToken, flexMessage).Do(); err != nil {
+		log.Printf("Error sending Flex Message: %v", err)
 	}
 
 	// เปลี่ยนสถานะผู้ใช้
@@ -844,10 +892,13 @@ func handleSaveavtivityend(bot *linebot.Client, event *linebot.Event, userID str
 	}
 
 	// ใช้ฟังก์ชัน FormatactivityRecordEndtime เพื่อสร้างข้อความตอบกลับ
-	replyMessage := FormatactivityRecordEndtime([]models.Activityrecord{*activityRecord})
-	sendReply(bot, event.ReplyToken, replyMessage)
-
-	log.Printf("บันทึกกิจกรรมสำเร็จ: %s", replyMessage)
+	flexMessage := flexmessage.FormatactivityRecordEndtime([]models.Activityrecord{*activityRecord})
+	if _, err := bot.ReplyMessage(event.ReplyToken, flexMessage).Do(); err != nil {
+		log.Printf("Error sending reply message: %v", err)
+		sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการส่งข้อความ กรุณาลองใหม่.")
+		return
+	}
+	log.Printf("บันทึกกิจกรรมสำเร็จ: %s", flexMessage)
 	resetUserState(userID)
 }
 func formatDuration(d time.Duration) string {
@@ -855,7 +906,6 @@ func formatDuration(d time.Duration) string {
 	minutes := int(d.Minutes()) % 60
 	return fmt.Sprintf("%d ชั่วโมง %d นาที", hours, minutes)
 }
-
 
 func createQuickReplyActivities() linebot.QuickReplyItems {
 	activities := []string{
@@ -897,10 +947,6 @@ func validateActivity(activity string) bool {
 		}
 	}
 	return false
-}
-
-func handleSystemManual(bot *linebot.Client, event *linebot.Event, State string) {
-	sendReply(bot, event.ReplyToken, "คุณสามารถดูคู่มือการใช้งานระบบได้ที่ลิงก์: https://example.com/manual")
 }
 
 func handleDefault(bot *linebot.Client, event *linebot.Event) {
