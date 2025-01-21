@@ -654,6 +654,7 @@ func FormatStartActivity(activity string) *linebot.BubbleContainer {
 						&linebot.TextComponent{
 							Type:    linebot.FlexComponentTypeText,
 							Text:    `กรุณากดปุ่ม "เริ่มกิจกรรม" เพื่อเริ่มบันทึกเวลา`,
+							Size:    linebot.FlexTextSizeTypeSm,
 							Align:   linebot.FlexComponentAlignTypeStart,
 							Gravity: linebot.FlexComponentGravityTypeCenter,
 							// Margin:  linebot.FlexComponentMarginTypeSm,
