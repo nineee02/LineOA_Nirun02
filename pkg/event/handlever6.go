@@ -8,7 +8,8 @@ import (
 	"nirun/pkg/database"
 	"nirun/pkg/flexmessage"
 	"nirun/pkg/models"
-	"nirun/service"
+
+	// "nirun/service"
 	"os"
 	"strings"
 	"time"
@@ -413,25 +414,25 @@ func handlePateintInfo(bot *linebot.Client, event *linebot.Event, userID string)
 	}
 	log.Println("เลขประจำตัวประชาชน:", cardID)
 
-	patient, err := service.PostRequestByID(cardID)
-	if err != nil {
-		log.Println("ErE:", err)
-		return
-	}
-	log.Println("Papatient:", patient)
-	// ดึงข้อมูลผู้ป่วยจาก CardID
-	// patient, err := GetPatientInfoByName(db, cardID)
+	// patient, err := service.PostRequestByID(cardID)
 	// if err != nil {
-	// 	log.Println("Error fetching patient info:", err)
-	// 	sendReply(bot, event.ReplyToken, "ไม่พบข้อมูลผู้สูงอายุ กรุณากรอกเลขประจำตัวประชาชนอีกครั้ง")
+	// 	log.Println("ErE:", err)
 	// 	return
 	// }
-	// flexMessage := flexmessage.FormatPatientInfo(patient)
-	// if _, err := bot.PushMessage(userID, flexMessage).Do(); err != nil {
-	// 	log.Println("Error sending push message:", err)
-	// }
+	// log.Println("Papatient:", patient)
+	// ดึงข้อมูลผู้ป่วยจาก CardID
+	patient, err := GetPatientInfoByName(db, cardID)
+	if err != nil {
+		log.Println("Error fetching patient info:", err)
+		sendReply(bot, event.ReplyToken, "ไม่พบข้อมูลผู้สูงอายุ กรุณากรอกเลขประจำตัวประชาชนอีกครั้ง")
+		return
+	}
+	flexMessage := flexmessage.FormatPatientInfo(&patient.PatientInfo)
+	if _, err := bot.PushMessage(userID, flexMessage).Do(); err != nil {
+		log.Println("Error sending push message:", err)
+	}
 
-	// log.Println("ข้อมูลผู้ป่วย:", flexMessage)
+	log.Println("ข้อมูลผู้ป่วย:", flexMessage)
 	userState[userID] = ""
 }
 
