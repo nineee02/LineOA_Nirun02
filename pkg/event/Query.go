@@ -13,7 +13,7 @@ import (
 
 // ดึงข้อมูลผู้ใช้ตาม LINE ID
 func GetUserInfoByLINEID(db *sql.DB, lineUserID string) (*models.User_info, error) {
-	query := `SELECT user_info_id, line_user_id, sex, name, email, phone_number, create_date, write_date
+	query := `SELECT user_info_id, line_user_id, sex, name_surname, email, phone_number, create_date, update_date
 	          FROM user_info WHERE line_user_id = ?`
 	row := db.QueryRow(query, lineUserID)
 
@@ -26,7 +26,7 @@ func GetUserInfoByLINEID(db *sql.DB, lineUserID string) (*models.User_info, erro
 		&user.Email,
 		&user.PhoneNumber,
 		&user.CreateDate,
-		&user.WriteDate,
+		&user.UpdateDate,
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -74,11 +74,11 @@ func RecordCheckIn(db *sql.DB, userID int) error {
 			INSERT INTO worktime_record (
 				check_in,
 				create_by,
-				write_by,
+				update_by,
 				user_info_id,
 				employee_info_id,
 				create_date,
-				write_date
+				update_date
 			)
 			VALUES (NOW(), ?, ?, ?, ?, NOW(), NOW())`
 		args = []interface{}{userID, userID, userID, employeeID.Int64}
@@ -87,10 +87,10 @@ func RecordCheckIn(db *sql.DB, userID int) error {
 			INSERT INTO worktime_record (
 				check_in,
 				create_by,
-				write_by,
+				update_by,
 				user_info_id,
 				create_date,
-				write_date
+				update_date
 			)
 			VALUES (NOW(), ?, ?, ?, NOW(), NOW())`
 		args = []interface{}{userID, userID, userID}
@@ -110,8 +110,8 @@ func RecordCheckOut(db *sql.DB, userID int) error {
 		UPDATE worktime_record
 		SET
 			check_out = NOW(),
-			write_date = NOW(),
-			write_by = ?
+			update_date = NOW(),
+			update_by = ?
 		WHERE user_info_id = ? AND check_out IS NULL`
 	_, err := db.Exec(query, userID, userID)
 	if err != nil {
@@ -180,9 +180,8 @@ func GetServiceInfoIDByActivity(db *sql.DB, activity string) (int, error) {
 func GetPatientInfoByName(db *sql.DB, cardID string) (*models.Activityrecord, error) {
 	query := `SELECT
 				p.card_id,
-				p.image,
 				p.patient_info_id,
-				p.username,
+				p.name_surname,
 				p.phone_number,
 				p.email,
 				p.address,
@@ -195,17 +194,17 @@ func GetPatientInfoByName(db *sql.DB, cardID string) (*models.Activityrecord, er
 				c.country_info_id,
 				c.country,
 				c.create_date,
-				c.write_date,
+				c.update_date,
 
 				r.religion_info_id,
 				r.religion,
 				r.create_date,
-				r.write_date,
+				r.update_date,
 
 				rtt.right_to_treatment_info_id,
 				rtt.right_to_treatment,
 				rtt.create_date,
-				rtt.write_date
+				rtt.update_date
 			FROM patient_info p
 			LEFT JOIN country_info c ON p.country_info_id = c.country_info_id
 			LEFT JOIN religion_info r ON p.religion_info_id = r.religion_info_id
@@ -214,11 +213,10 @@ func GetPatientInfoByName(db *sql.DB, cardID string) (*models.Activityrecord, er
 
 	// สร้างโครงสร้างเพื่อเก็บผลลัพธ์
 	patient := &models.Activityrecord{}
-	var imagePath []byte
+	// var imagePath []byte
 
 	err := db.QueryRow(query, cardID).Scan(
 		&patient.PatientInfo.CardID,
-		&imagePath,
 		&patient.PatientInfo.PatientInfo_ID,
 		&patient.PatientInfo.Name,
 		&patient.PatientInfo.PhoneNumber,
@@ -233,17 +231,17 @@ func GetPatientInfoByName(db *sql.DB, cardID string) (*models.Activityrecord, er
 		&patient.PatientInfo.CountryInfo.CountryInfo_ID,
 		&patient.PatientInfo.CountryInfo.Country,
 		&patient.PatientInfo.CountryInfo.CreateDate,
-		&patient.PatientInfo.CountryInfo.WriteDate,
+		&patient.PatientInfo.CountryInfo.UpdateDate,
 
 		&patient.PatientInfo.Religion.ReligionInfo_ID,
 		&patient.PatientInfo.Religion.Religion,
 		&patient.PatientInfo.Religion.CreateDate,
-		&patient.PatientInfo.Religion.WriteDate,
+		&patient.PatientInfo.Religion.UpdateDate,
 
 		&patient.PatientInfo.RightToTreatmentInfo.RightToTreatmentInfo_ID,
 		&patient.PatientInfo.RightToTreatmentInfo.Right_to_treatment,
 		&patient.PatientInfo.RightToTreatmentInfo.CreateDate,
-		&patient.PatientInfo.RightToTreatmentInfo.WriteDate,
+		&patient.PatientInfo.RightToTreatmentInfo.UpdateDate,
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -252,77 +250,284 @@ func GetPatientInfoByName(db *sql.DB, cardID string) (*models.Activityrecord, er
 		return nil, fmt.Errorf("เกิดข้อผิดพลาดในการดึงข้อมูลผู้ป่วย: %v", err)
 	}
 
-	// แปลง imagePath จาก []byte เป็น string และเก็บในโครงสร้าง
-	patient.PatientInfo.ImagePath = string(imagePath)
+	// // แปลง imagePath จาก []byte เป็น string และเก็บในโครงสร้าง
+	// patient.PatientInfo.ImagePath = string(imagePath)
 
 	return patient, nil
 }
 
-// บันทึกกิจกรรม
-func SaveActivityRecord(db *sql.DB, activity *models.Activityrecord) error {
-	// ดึง patient_info_id
+// กิจกรรมมิติเทคโนโลยี
+func GetTechnologyActivities(db *sql.DB) ([]models.ActivityTechnologyInfo, error) {
+	query := `SELECT activity_technology_info_id, activity, service_type, create_date FROM activity_technology_info`
+	rows, err := db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var activities []models.ActivityTechnologyInfo
+	for rows.Next() {
+		var activity models.ActivityTechnologyInfo
+		if err := rows.Scan(&activity.ActivityTechnologyInfo_ID, &activity.ActivityTechnology, &activity.ServiceType, &activity.CreateDate); err != nil {
+			return nil, err
+		}
+		activities = append(activities, activity)
+	}
+
+	return activities, nil
+}
+// กิจกรรมมิติสังคม
+func GetSocialActivities(db *sql.DB) ([]models.ActivitySocialInfo, error) {
+	query := `SELECT activity_social_info_id, activity, service_type, create_date FROM activity_social_info`
+	rows, err := db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var activities []models.ActivitySocialInfo
+	for rows.Next() {
+		var activity models.ActivitySocialInfo
+		if err := rows.Scan(&activity.ActivitySocialInfo_ID, &activity.ActivitySocial, &activity.ServiceType, &activity.CreateDate); err != nil {
+			return nil, err
+		}
+		activities = append(activities, activity)
+	}
+
+	return activities, nil
+}
+// กิจกรรมมิติสุขภาพ
+func GetHealthActivities(db *sql.DB) ([]models.ActivityHealthInfo, error) {
+	query := `SELECT activity_health_info_id, activity, service_type, create_date FROM activity_health_info`
+	rows, err := db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var activities []models.ActivityHealthInfo
+	for rows.Next() {
+		var activity models.ActivityHealthInfo
+		if err := rows.Scan(&activity.ActivityHealthInfo_ID, &activity.ActivityHealth, &activity.ServiceType, &activity.CreateDate); err != nil {
+			return nil, err
+		}
+		activities = append(activities, activity)
+	}
+
+	return activities, nil
+}
+// กิจกรรมมิติเศรษฐกิจ
+func GetEconomicActivities(db *sql.DB) ([]models.ActivityEconomicInfo, error) {
+	query := `SELECT activity_economic_info_id, activity, service_type, create_date FROM activity_economic_info`
+	rows, err := db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var activities []models.ActivityEconomicInfo
+	for rows.Next() {
+		var activity models.ActivityEconomicInfo
+		if err := rows.Scan(&activity.ActivityEconomicInfo_ID, &activity.ActivityEconomic, &activity.ServiceType, &activity.CreateDate); err != nil {
+			return nil, err
+		}
+		activities = append(activities, activity)
+	}
+
+	return activities, nil
+}
+// กิจกรรมมิติสภาพแวดล้อม
+func GetEnvironmentalActivities(db *sql.DB) ([]models.ActivityEnvironmentalInfo, error) {
+	query := `SELECT activity_environmental_info_id, activity, service_type, create_date FROM activity_environmental_info`
+	rows, err := db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var activities []models.ActivityEnvironmentalInfo
+	for rows.Next() {
+		var activity models.ActivityEnvironmentalInfo
+		if err := rows.Scan(&activity.ActivityEnvironmentalInfo_ID, &activity.ActivityEnvironmental, &activity.ServiceType, &activity.CreateDate); err != nil {
+			return nil, err
+		}
+		activities = append(activities, activity)
+	}
+
+	return activities, nil
+}
+func GetActivityInfoIDByType(db *sql.DB, category string, activityName string) (int, error) {
+	var query string
+	switch category {
+	case "technology":
+		query = `SELECT activity_technology_info_id FROM activity_technology_info WHERE activity = ?`
+	case "social":
+		query = `SELECT activity_social_info_id FROM activity_social_info WHERE activity = ?`
+	case "health":
+		query = `SELECT activity_health_info_id FROM activity_health_info WHERE activity = ?`
+	case "economic":
+		query = `SELECT activity_economic_info_id FROM activity_economic_info WHERE activity = ?`
+	case "environmental":
+		query = `SELECT activity_environmental_info_id FROM activity_environmental_info WHERE activity = ?`
+	default:
+		return 0, fmt.Errorf("invalid activity category")
+	}
+
+	var activityInfoID int
+	err := db.QueryRow(query, activityName).Scan(&activityInfoID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return 0, fmt.Errorf("ไม่พบข้อมูลกิจกรรม: %s", activityName)
+		}
+		return 0, err
+	}
+	return activityInfoID, nil
+}
+
+//[บันทึกกกิจกรรม]
+func SaveActivityRecord(db *sql.DB, activity *models.Activityrecord, category string) error {
+	// ✅ ดึง patient_info_id
 	patient, err := GetPatientInfoByName(db, activity.PatientInfo.CardID)
 	if err != nil {
 		log.Printf("Error fetching patient_info_id: %v", err)
 		return fmt.Errorf("error fetching patient_info_id: %v", err)
 	}
 	activity.PatientInfo.PatientInfo_ID = patient.PatientInfo.PatientInfo_ID
-	// ตรวจสอบว่าค่า patient_info_id ถูกต้อง
+
+	// ✅ ตรวจสอบ patient_info_id
 	if activity.PatientInfo.PatientInfo_ID == 0 {
 		log.Println("Invalid patient_info_id")
 		return fmt.Errorf("patient_info_id is missing or invalid")
 	}
 
-	// ดึง service_info_id
-	serviceInfoID, err := GetServiceInfoIDByActivity(db, activity.ServiceInfo.Activity)
-	if err != nil {
-		log.Printf("Error fetching service_info_id: %v", err)
-		return fmt.Errorf("error fetching service_info_id: %v", err)
+	// ✅ ตรวจสอบ activity_info_id และเลือกคอลัมน์ที่ถูกต้อง
+	var activityInfoColumn string
+	activityInfoID := activity.ActivityRecord_ID
+
+	switch category {
+	case "technology":
+		activityInfoColumn = "activity_technology_info_id"
+	case "social":
+		activityInfoColumn = "activity_social_info_id"
+	case "health":
+		activityInfoColumn = "activity_health_info_id"
+	case "economic":
+		activityInfoColumn = "activity_economic_info_id"
+	case "environmental":
+		activityInfoColumn = "activity_environmental_info_id"
+	default:
+		log.Println("Invalid category:", category)
+		return fmt.Errorf("invalid category selected")
 	}
 
-	// ตรวจสอบว่า service_info_id มีอยู่จริง
-	if serviceInfoID == 0 {
-		log.Println("Invalid service_info_id")
-		return fmt.Errorf("service_info_id is invalid or missing")
+	if activityInfoID == 0 {
+		log.Println("No activity selected")
+		return fmt.Errorf("no activity selected")
 	}
 
-	query := `
+	// ✅ ใช้ Dynamic SQL Query เพื่อเลือกคอลัมน์ที่ถูกต้อง
+	query := fmt.Sprintf(`
 		INSERT INTO activity_record (
 			patient_info_id,
-			service_info_id,
+			%s, 
 			start_time,
 			create_by,
-			write_by
-		)
-		VALUES (?, ?, ?, ?, ?)
-		`
+			update_by
+		) VALUES (?, ?, ?, ?, ?)
+	`, activityInfoColumn)
+
 	result, err := db.Exec(query,
 		activity.PatientInfo.PatientInfo_ID,
-		serviceInfoID,
-		time.Now(),
-		activity.UserInfo.UserInfo_ID, // ใช้ UserInfo_ID สำหรับ create_by
-		activity.UserInfo.UserInfo_ID, // ใช้ UserInfo_ID สำหรับ write_by
+		activityInfoID,       
+		time.Now(),           
+		activity.UserInfo.UserInfo_ID, 
+		activity.UserInfo.UserInfo_ID, 
 	)
 	if err != nil {
 		log.Printf("Error inserting activity record: %v", err)
 		return fmt.Errorf("error inserting activity record: %v", err)
 	}
 
-	// ดึง activity_record_id ที่ถูกเพิ่มขึ้นมา
+	// ✅ ดึง activity_record_id
 	activityRecordID, err := result.LastInsertId()
 	if err != nil {
 		log.Printf("Error retrieving last insert id: %v", err)
 		return fmt.Errorf("error retrieving last insert id: %v", err)
 	}
 
-	// บันทึก activityRecordID ลงใน activity
 	activity.ActivityRecord_ID = int(activityRecordID)
-
-	log.Printf("activity.ActivityRecord_ID:%d", activity.ActivityRecord_ID)
-	log.Println("Activity record saved successfully")
+	log.Printf("ActivityRecord_ID: %d saved successfully", activity.ActivityRecord_ID)
 	return nil
-
 }
+
+
+
+
+// บันทึกกิจกรรม
+// func SaveActivityRecord(db *sql.DB, activity *models.Activityrecord) error {
+// 	// ดึง patient_info_id
+// 	patient, err := GetPatientInfoByName(db, activity.PatientInfo.CardID)
+// 	if err != nil {
+// 		log.Printf("Error fetching patient_info_id: %v", err)
+// 		return fmt.Errorf("error fetching patient_info_id: %v", err)
+// 	}
+// 	activity.PatientInfo.PatientInfo_ID = patient.PatientInfo.PatientInfo_ID
+// 	// ตรวจสอบว่าค่า patient_info_id ถูกต้อง
+// 	if activity.PatientInfo.PatientInfo_ID == 0 {
+// 		log.Println("Invalid patient_info_id")
+// 		return fmt.Errorf("patient_info_id is missing or invalid")
+// 	}
+
+// 	// ดึง service_info_id
+// 	serviceInfoID, err := GetServiceInfoIDByActivity(db, activity.ServiceInfo.Activity)
+// 	if err != nil {
+// 		log.Printf("Error fetching service_info_id: %v", err)
+// 		return fmt.Errorf("error fetching service_info_id: %v", err)
+// 	}
+
+// 	// ตรวจสอบว่า service_info_id มีอยู่จริง
+// 	if serviceInfoID == 0 {
+// 		log.Println("Invalid service_info_id")
+// 		return fmt.Errorf("service_info_id is invalid or missing")
+// 	}
+
+// 	query := `
+// 		INSERT INTO activity_record (
+// 			patient_info_id,
+// 			service_info_id,
+// 			start_time,
+// 			create_by,
+// 			write_by
+// 		)
+// 		VALUES (?, ?, ?, ?, ?)
+// 		`
+// 	result, err := db.Exec(query,
+// 		activity.PatientInfo.PatientInfo_ID,
+// 		serviceInfoID,
+// 		time.Now(),
+// 		activity.UserInfo.UserInfo_ID, // ใช้ UserInfo_ID สำหรับ create_by
+// 		activity.UserInfo.UserInfo_ID, // ใช้ UserInfo_ID สำหรับ write_by
+// 	)
+// 	if err != nil {
+// 		log.Printf("Error inserting activity record: %v", err)
+// 		return fmt.Errorf("error inserting activity record: %v", err)
+// 	}
+
+// 	// ดึง activity_record_id ที่ถูกเพิ่มขึ้นมา
+// 	activityRecordID, err := result.LastInsertId()
+// 	if err != nil {
+// 		log.Printf("Error retrieving last insert id: %v", err)
+// 		return fmt.Errorf("error retrieving last insert id: %v", err)
+// 	}
+
+// 	// บันทึก activityRecordID ลงใน activity
+// 	activity.ActivityRecord_ID = int(activityRecordID)
+
+// 	log.Printf("activity.ActivityRecord_ID:%d", activity.ActivityRecord_ID)
+// 	log.Println("Activity record saved successfully")
+// 	return nil
+
+// }
 
 // ดึงข้อมูลactivity_recordผ่าน card_idของผู้สูงอายุ
 func GetActivityRecordID(db *sql.DB, cardID string) (int, error) {
@@ -435,20 +640,19 @@ func UpdateActivityEndTime(db *sql.DB, activity *models.Activityrecord) error {
 	return nil
 }
 
-
 // บันทึกกิจกรรม
-func SaveActivity(db *sql.DB, activity string) error {
-	if !validateActivity(activity) {
-		return fmt.Errorf("กิจกรรม '%s' ไม่ตรงกับค่าที่อนุญาตในฐานข้อมูล", activity)
-	}
+// func SaveActivity(db *sql.DB, activity string) error {
+// 	if !validateActivity(activity) {
+// 		return fmt.Errorf("กิจกรรม '%s' ไม่ตรงกับค่าที่อนุญาตในฐานข้อมูล", activity)
+// 	}
 
-	query := `INSERT INTO service_info (activity) VALUES (?)`
-	_, err := db.Exec(query, activity)
-	if err != nil {
-		return fmt.Errorf("ไม่สามารถบันทึกกิจกรรม %s ได้: %v", activity, err)
-	}
-	return nil
-}
+// 	query := `INSERT INTO service_info (activity) VALUES (?)`
+// 	_, err := db.Exec(query, activity)
+// 	if err != nil {
+// 		return fmt.Errorf("ไม่สามารถบันทึกกิจกรรม %s ได้: %v", activity, err)
+// 	}
+// 	return nil
+// }
 
 // ***************************************************************************************************************************
 // อัปโหลดไฟล์ไปยัง MinIO
@@ -538,7 +742,7 @@ func GetEmployeeIDByName(db *sql.DB, employeeName string) (int, error) {
 	err := db.QueryRow(query, employeeName).Scan(&employeeID)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return 0, fmt.Errorf("ไม่พบพนักงานที่ชื่อ %s", employeeName)
+			return 0, fmt.Errorf("ไม่พบพนักงานที่ชื่อ %s\nกรุณากรอกชื่อพนักงานอีกครั้ง", employeeName)
 		}
 		log.Printf("Error fetching employee info: %v", err)
 		return 0, fmt.Errorf("เกิดข้อผิดพลาดในการค้นหาข้อมูลพนักงาน")

@@ -56,47 +56,47 @@ func FormatPatientInfo(patient *models.Activityrecord) string {
 	)
 }
 
-func FormatServiceInfo(activity []models.Activityrecord) string {
-	// สร้างข้อความสำหรับชื่อผู้ป่วยและกิจกรรมที่สำเร็จแล้ว
-	message := fmt.Sprintf("ชื่อผู้รับบริการ: %s\n", activity[0].PatientInfo.Name)
-	for _, info := range activity {
-		message += fmt.Sprintf(" %s\n", info.ServiceInfo.Activity)
-	}
+// func FormatServiceInfo(activity []models.Activityrecord) string {
+// 	// สร้างข้อความสำหรับชื่อผู้ป่วยและกิจกรรมที่สำเร็จแล้ว
+// 	message := fmt.Sprintf("ชื่อผู้รับบริการ: %s\n", activity[0].PatientInfo.Name)
+// 	for _, info := range activity {
+// 		message += fmt.Sprintf(" %s\n", info.ServiceInfo.Activity)
+// 	}
 
-	// เพิ่มรายการกิจกรรมที่สามารถเลือกเพิ่มได้
-	activities := []string{
-		"แช่เท้า", "นวด/ประคบ", "ฝังเข็ม", "คาราโอเกะ", "ครอบแก้ว",
-		"ทำอาหาร", "นั่งสมาธิ", "เล่าสู่กัน", "ซุโดกุ", "จับคู่ภาพ",
-	}
-	message += "\nเลือกกิจกรรมที่คุณต้องการเพิ่ม:\n"
-	for _, activity := range activities {
+// 	// เพิ่มรายการกิจกรรมที่สามารถเลือกเพิ่มได้
+// 	activities := []string{
+// 		"แช่เท้า", "นวด/ประคบ", "ฝังเข็ม", "คาราโอเกะ", "ครอบแก้ว",
+// 		"ทำอาหาร", "นั่งสมาธิ", "เล่าสู่กัน", "ซุโดกุ", "จับคู่ภาพ",
+// 	}
+// 	message += "\nเลือกกิจกรรมที่คุณต้องการเพิ่ม:\n"
+// 	for _, activity := range activities {
 
-		message += fmt.Sprintf("- %s\n", activity)
-	}
-	return message
-}
-func FormatactivityRecordStarttime(starttime []models.Activityrecord) string {
-	var result string
-	for _, record := range starttime {
-		result += fmt.Sprintf(
-			"เริ่มบันทึกกิจกรรม: %s\nของ %s\nที่: %s\n\nกรุณาพิมพ์ 'เสร็จสิ้น' เมื่อทำกิจกรรมเสร็จ",
-			record.ServiceInfo.Activity,
-			record.PatientInfo.Name,
-			record.StartTime.Format("2006-01-02 15:04:05 PM"),
-		)
-	}
-	return result
-}
-func FormatactivityRecordEndtime(endtime []models.Activityrecord) string {
-	var result string
-	for _, record := range endtime {
-		result += fmt.Sprintf(
-			"บันทึกกิจกรรม: %s\nของ %s\nที่: %s\n%s\n!!!สำเร็จ!!!",
-			record.ServiceInfo.Activity,
-			record.PatientInfo.Name,
-			record.EndTime.Format("2006-01-02 15:04:05 PM"),
-			record.Period,
-		)
-	}
-	return result
-}
+// 		message += fmt.Sprintf("- %s\n", activity)
+// 	}
+// 	return message
+// }
+// func FormatactivityRecordStarttime(starttime []models.Activityrecord) string {
+// 	var result string
+// 	for _, record := range starttime {
+// 		result += fmt.Sprintf(
+// 			"เริ่มบันทึกกิจกรรม: %s\nของ %s\nที่: %s\n\nกรุณาพิมพ์ 'เสร็จสิ้น' เมื่อทำกิจกรรมเสร็จ",
+// 			record.ServiceInfo.Activity,
+// 			record.PatientInfo.Name,
+// 			record.StartTime.Format("2006-01-02 15:04:05 PM"),
+// 		)
+// 	}
+// 	return result
+// }
+// func FormatactivityRecordEndtime(endtime []models.Activityrecord) string {
+// 	var result string
+// 	for _, record := range endtime {
+// 		result += fmt.Sprintf(
+// 			"บันทึกกิจกรรม: %s\nของ %s\nที่: %s\n%s\n!!!สำเร็จ!!!",
+// 			record.ServiceInfo.Activity,
+// 			record.PatientInfo.Name,
+// 			record.EndTime.Format("2006-01-02 15:04:05 PM"),
+// 			record.Period,
+// 		)
+// 	}
+// 	return result
+// }

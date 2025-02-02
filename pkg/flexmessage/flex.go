@@ -1,7 +1,6 @@
 package flexmessage
 
 import (
-	"fmt"
 	"nirun/pkg/models"
 	"strings"
 	"time"
@@ -13,7 +12,7 @@ func getCurrentTime() string {
 	format := "02-01-2006 03:04 PM"
 	return time.Now().Format(format)
 }
-func FormatConfirmationWorktime(worktimeRecord *models.WorktimeRecord) *linebot.FlexMessage {
+func FormatConfirmCheckin(worktimeRecord *models.WorktimeRecord) *linebot.FlexMessage {
 	// ตรวจสอบว่า worktimeRecord ไม่เป็น nil
 	if worktimeRecord == nil {
 		return nil
@@ -42,22 +41,6 @@ func FormatConfirmationWorktime(worktimeRecord *models.WorktimeRecord) *linebot.
 			Layout:  linebot.FlexBoxLayoutTypeVertical,
 			Spacing: linebot.FlexComponentSpacingTypeMd,
 			Contents: []linebot.FlexComponent{
-				// ข้อความแนะนำ
-				&linebot.TextComponent{
-					Type:    linebot.FlexComponentTypeText,
-					Text:    "กรุณาเลือกดำเนินการ",
-					Weight:  linebot.FlexTextWeightTypeRegular,
-					Size:    linebot.FlexTextSizeTypeMd,
-					Color:   "#212121",
-					Align:   linebot.FlexComponentAlignTypeStart,
-					Gravity: linebot.FlexComponentGravityTypeCenter,
-				},
-				// เส้นแบ่ง
-				&linebot.SeparatorComponent{
-					Color:  "#58BDCF",
-					Margin: linebot.FlexComponentMarginTypeMd,
-				},
-				// ปุ่ม Check-in และ Check-out
 				&linebot.BoxComponent{
 					Type:    linebot.FlexComponentTypeBox,
 					Layout:  linebot.FlexBoxLayoutTypeVertical,
@@ -73,14 +56,58 @@ func FormatConfirmationWorktime(worktimeRecord *models.WorktimeRecord) *linebot.
 							Style: linebot.FlexButtonStyleTypePrimary,
 							Color: "#00bcd4",
 						},
+					},
+				},
+			},
+		},
+	}
+
+	// ส่งกลับ Flex Message
+	return linebot.NewFlexMessage("ยืนยันการเช็คอิน/เช็คเอ้าท์", container)
+}
+func FormatConfirmCheckout(worktimeRecord *models.WorktimeRecord) *linebot.FlexMessage {
+	// ตรวจสอบว่า worktimeRecord ไม่เป็น nil
+	if worktimeRecord == nil {
+		return nil
+	}
+
+	// สร้าง BubbleContainer สำหรับ Flex Message
+	container := &linebot.BubbleContainer{
+		Type:      linebot.FlexContainerTypeBubble,
+		Direction: linebot.FlexBubbleDirectionTypeLTR, Header: &linebot.BoxComponent{
+			Type:   linebot.FlexComponentTypeBox,
+			Layout: linebot.FlexBoxLayoutTypeVertical,
+			Contents: []linebot.FlexComponent{
+				&linebot.TextComponent{
+					Type:   linebot.FlexComponentTypeText,
+					Text:   "ลงเวลางาน",
+					Weight: linebot.FlexTextWeightTypeBold,
+					Size:   linebot.FlexTextSizeTypeLg,
+					Color:  "#FFFFFF",
+					Align:  linebot.FlexComponentAlignTypeCenter,
+				},
+			},
+			BackgroundColor: "#00bcd4",
+		},
+		Body: &linebot.BoxComponent{
+			Type:    linebot.FlexComponentTypeBox,
+			Layout:  linebot.FlexBoxLayoutTypeVertical,
+			Spacing: linebot.FlexComponentSpacingTypeMd,
+			Contents: []linebot.FlexComponent{
+				&linebot.BoxComponent{
+					Type:    linebot.FlexComponentTypeBox,
+					Layout:  linebot.FlexBoxLayoutTypeVertical,
+					Spacing: linebot.FlexComponentSpacingTypeMd,
+					Margin:  linebot.FlexComponentMarginTypeLg,
+					Contents: []linebot.FlexComponent{
 						&linebot.ButtonComponent{
 							Type: linebot.FlexComponentTypeButton,
 							Action: &linebot.MessageAction{
 								Label: "เช็คเอ้าท์",
 								Text:  "เช็คเอ้าท์",
 							},
-							Style: linebot.FlexButtonStyleTypeSecondary,
-							// color:"#ddeff2",
+							Style: linebot.FlexButtonStyleTypePrimary,
+							Color: "#00bcd4",
 						},
 					},
 				},
@@ -311,7 +338,7 @@ func intPtr(i int) *int {
 	return &i
 }
 
-func FormatPatientInfo(patient *models.Activityrecord) *linebot.FlexMessage {
+func FormatPatientInfo(patient *models.PatientInfo) *linebot.FlexMessage {
 	// สร้าง BubbleContainer
 	container := &linebot.BubbleContainer{
 		// 	Type: linebot.FlexContainerTypeBubble,
@@ -353,27 +380,27 @@ func FormatPatientInfo(patient *models.Activityrecord) *linebot.FlexMessage {
 			Contents: []linebot.FlexComponent{
 				&linebot.TextComponent{
 					Type:   linebot.FlexComponentTypeText,
-					Text:   patient.PatientInfo.Name,
+					Text:   patient.Name,
 					Weight: linebot.FlexTextWeightTypeBold,
 					Size:   linebot.FlexTextSizeTypeLg,
 					Color:  "#000000",
 					Align:  linebot.FlexComponentAlignTypeStart,
 				},
 				// บรรทัดที่สอง: ข้อมูลเลขประจำตัวประชาชน
-				&linebot.TextComponent{
-					Type:   linebot.FlexComponentTypeText,
-					Text:   "เลขประจำตัวประชาชน: " + patient.PatientInfo.CardID,
-					Size:   linebot.FlexTextSizeTypeSm,
-					Color:  "#555555",
-					Margin: linebot.FlexComponentMarginTypeXs,
-					Align:  linebot.FlexComponentAlignTypeStart,
-				},
+				// &linebot.TextComponent{
+				// 	Type:   linebot.FlexComponentTypeText,
+				// 	Text:   "เลขประจำตัวประชาชน: " + patient.PatientInfo.CardID,
+				// 	Size:   linebot.FlexTextSizeTypeSm,
+				// 	Color:  "#555555",
+				// 	Margin: linebot.FlexComponentMarginTypeXs,
+				// 	Align:  linebot.FlexComponentAlignTypeStart,
+				// },
 				// ข้อมูลผู้ป่วย
-				createTextRow("อายุ", patient.PatientInfo.Age+" ปี"),
-				createTextRow("เพศ", formatGender(patient.PatientInfo.Sex)),
-				createTextRow("หมู่เลือด", patient.PatientInfo.Blood),
-				createTextRow("ADL", patient.PatientInfo.ADL),
-				createTextRow("เบอร์", patient.PatientInfo.PhoneNumber),
+				createTextRow("อายุ", patient.Age+" ปี"),
+				createTextRow("เพศ", formatGender(patient.Sex)),
+				createTextRow("หมู่เลือด", patient.Blood),
+				createTextRow("ADL", patient.ADL),
+				createTextRow("เบอร์", patient.PhoneNumber),
 				&linebot.SeparatorComponent{
 					Type:   linebot.FlexComponentTypeSeparator,
 					Color:  "#58BDCF",
@@ -395,7 +422,7 @@ func FormatPatientInfo(patient *models.Activityrecord) *linebot.FlexMessage {
 						},
 						&linebot.TextComponent{
 							Type:   linebot.FlexComponentTypeText,
-							Text:   patient.PatientInfo.RightToTreatmentInfo.Right_to_treatment,
+							Text:   patient.RightToTreatmentInfo.Right_to_treatment,
 							Size:   linebot.FlexTextSizeTypeMd,
 							Color:  "#212121",
 							Align:  linebot.FlexComponentAlignTypeStart,
@@ -443,8 +470,262 @@ func formatGender(sex string) string {
 	return "ไม่ระบุ"
 }
 
-// ฟังก์ชันสร้างแถวข้อความ
+func FormatServiceSelection() *linebot.FlexMessage {
+	// สร้าง BubbleContainer สำหรับ Flex Message
+	container := &linebot.BubbleContainer{
+		Type: linebot.FlexContainerTypeBubble,
+		// Direction: linebot.FlexBubbleDirectionTypeLTR, Header: &linebot.BoxComponent{
+		// 	Type:   linebot.FlexComponentTypeBox,
+		// 	Layout: linebot.FlexBoxLayoutTypeVertical,
+		// 	Contents: []linebot.FlexComponent{
+		// 		&linebot.TextComponent{
+		// 			Type:   linebot.FlexComponentTypeText,
+		// 			Text:   "ลงเวลางาน",
+		// 			Weight: linebot.FlexTextWeightTypeBold,
+		// 			Size:   linebot.FlexTextSizeTypeLg,
+		// 			Color:  "#FFFFFF",
+		// 			Align:  linebot.FlexComponentAlignTypeCenter,
+		// 		},
+		// 	},
+		// 	BackgroundColor: "#00bcd4",
+		// },
+		Body: &linebot.BoxComponent{
 
+			Type:    linebot.FlexComponentTypeBox,
+			Layout:  linebot.FlexBoxLayoutTypeVertical,
+			Spacing: linebot.FlexComponentSpacingTypeMd,
+
+			Contents: []linebot.FlexComponent{
+				&linebot.BoxComponent{
+					Type:    linebot.FlexComponentTypeBox,
+					Layout:  linebot.FlexBoxLayoutTypeVertical,
+					Spacing: linebot.FlexComponentSpacingTypeMd,
+					Margin:  linebot.FlexComponentMarginTypeLg,
+					Contents: []linebot.FlexComponent{
+						&linebot.TextComponent{
+							Type:   linebot.FlexComponentTypeText,
+							Text:   "เลือกบริการ:",
+							Weight: linebot.FlexTextWeightTypeBold,
+							Size:   linebot.FlexTextSizeTypeMd,
+							Color:  "#00bcd4",
+							Margin: linebot.FlexComponentMarginTypeMd,
+							Align:  linebot.FlexComponentAlignTypeStart,
+						},
+						&linebot.SeparatorComponent{
+							Type:   linebot.FlexComponentTypeSeparator,
+							Color:  "#58BDCF",
+							Margin: linebot.FlexComponentMarginTypeXl,
+						},
+						&linebot.ButtonComponent{
+							Type: linebot.FlexComponentTypeButton,
+							Action: &linebot.MessageAction{
+								Label: "บันทึกกิจกรรม",
+								Text:  "บันทึกกิจกรรม",
+							},
+							Style: linebot.FlexButtonStyleTypePrimary,
+							Color: "#00bcd4",
+						},
+						&linebot.ButtonComponent{
+							Type: linebot.FlexComponentTypeButton,
+							Action: &linebot.MessageAction{
+								Label: "รายงานปัญหา",
+								Text:  "รายงานปัญหา",
+							},
+							Style: linebot.FlexButtonStyleTypePrimary,
+							Color: "#00bcd4",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	// ส่งกลับ Flex Message
+	return linebot.NewFlexMessage("บันทึกกิจกรรม/รายงานปัญหา", container)
+}
+
+// มิติกิจกรรม
+func FormatActivityCategories() *linebot.FlexMessage {
+	container := &linebot.BubbleContainer{
+		Type: linebot.FlexContainerTypeBubble,
+		// Direction: linebot.FlexBubbleDirectionTypeLTR, Header: &linebot.BoxComponent{
+		// 	Type:   linebot.FlexComponentTypeBox,
+		// 	Layout: linebot.FlexBoxLayoutTypeVertical,
+		// 	Contents: []linebot.FlexComponent{
+		// 		&linebot.TextComponent{
+		// 			Type:   linebot.FlexComponentTypeText,
+		// 			Text:   "ลงเวลางาน",
+		// 			Weight: linebot.FlexTextWeightTypeBold,
+		// 			Size:   linebot.FlexTextSizeTypeLg,
+		// 			Color:  "#FFFFFF",
+		// 			Align:  linebot.FlexComponentAlignTypeCenter,
+		// 		},
+		// 	},
+		// 	BackgroundColor: "#00bcd4",
+		// },
+		Body: &linebot.BoxComponent{
+
+			Type:    linebot.FlexComponentTypeBox,
+			Layout:  linebot.FlexBoxLayoutTypeVertical,
+			Spacing: linebot.FlexComponentSpacingTypeMd,
+
+			Contents: []linebot.FlexComponent{
+				&linebot.BoxComponent{
+					Type:    linebot.FlexComponentTypeBox,
+					Layout:  linebot.FlexBoxLayoutTypeVertical,
+					Spacing: linebot.FlexComponentSpacingTypeMd,
+					Margin:  linebot.FlexComponentMarginTypeLg,
+					Contents: []linebot.FlexComponent{
+						&linebot.TextComponent{
+							Type:   linebot.FlexComponentTypeText,
+							Text:   "เลือกมิติของกิจกรรม:",
+							Weight: linebot.FlexTextWeightTypeBold,
+							Size:   linebot.FlexTextSizeTypeMd,
+							Color:  "#00bcd4",
+							Margin: linebot.FlexComponentMarginTypeMd,
+							Align:  linebot.FlexComponentAlignTypeStart,
+						},
+						&linebot.SeparatorComponent{
+							Type:   linebot.FlexComponentTypeSeparator,
+							Color:  "#58BDCF",
+							Margin: linebot.FlexComponentMarginTypeXl,
+						},
+						&linebot.ButtonComponent{
+							Type: linebot.FlexComponentTypeButton,
+							Action: &linebot.MessageAction{
+								Label: "มิติเทคโนโลยี",
+								Text:  "มิติเทคโนโลยี",
+							},
+							Style: linebot.FlexButtonStyleTypePrimary,
+							Color: "#00bcd4",
+						},
+						&linebot.ButtonComponent{
+							Type: linebot.FlexComponentTypeButton,
+							Action: &linebot.MessageAction{
+								Label: "มิติสังคม",
+								Text:  "มิติสังคม",
+							},
+							Style: linebot.FlexButtonStyleTypePrimary,
+							Color: "#00bcd4",
+						},
+						&linebot.ButtonComponent{
+							Type: linebot.FlexComponentTypeButton,
+							Action: &linebot.MessageAction{
+								Label: "มิติสุขภาพ",
+								Text:  "มิติสุขภาพ",
+							},
+							Style: linebot.FlexButtonStyleTypePrimary,
+							Color: "#00bcd4",
+						},
+						&linebot.ButtonComponent{
+							Type: linebot.FlexComponentTypeButton,
+							Action: &linebot.MessageAction{
+								Label: "มิติเศรษฐกิจ",
+								Text:  "มิติเศรษฐกิจ",
+							},
+							Style: linebot.FlexButtonStyleTypePrimary,
+							Color: "#00bcd4",
+						},
+						&linebot.ButtonComponent{
+							Type: linebot.FlexComponentTypeButton,
+							Action: &linebot.MessageAction{
+								Label: "มิติสภาพแวดล้อม",
+								Text:  "มิติสภาพแวดล้อม",
+							},
+							Style: linebot.FlexButtonStyleTypePrimary,
+							Color: "#00bcd4",
+						},
+						&linebot.ButtonComponent{
+							Type: linebot.FlexComponentTypeButton,
+							Action: &linebot.MessageAction{
+								Label: "มิติอื่นๆ",
+								Text:  "มิติอื่นๆ",
+							},
+							Style: linebot.FlexButtonStyleTypePrimary,
+							Color: "#00bcd4",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	// ส่งกลับ Flex Message
+	return linebot.NewFlexMessage("เลือกมิติกิจกรรม", container)
+}
+//แสดงรายการกิจกรรม
+func FormatActivities(activities []string) *linebot.FlexMessage {
+	var activityButtons []linebot.FlexComponent
+
+	// ✅ จำกัด Label ของปุ่มไม่เกิน 40 ตัวอักษร
+	truncateLabel := func(text string) string {
+		if len(text) > 40 {
+			return text[:37] + "..." // ตัดให้เหลือ 37 ตัว แล้วเติม "..."
+		}
+		return text
+	}
+
+	// ✅ สร้างปุ่มกิจกรรมจากรายการที่รับมา
+	for _, activity := range activities {
+		trimmedActivity := strings.TrimSpace(activity) // ตัดช่องว่างด้านหน้า-หลัง
+		if trimmedActivity == "" {
+			continue // ข้ามกิจกรรมที่เป็นค่าว่าง
+		}
+
+		button := &linebot.ButtonComponent{
+			Type:   linebot.FlexComponentTypeButton,
+			Style:  linebot.FlexButtonStyleTypePrimary,
+			Height: linebot.FlexButtonHeightTypeMd,
+			Action: &linebot.MessageAction{
+				Label: truncateLabel(trimmedActivity), // ✅ ตรวจสอบความยาว
+				Text:  trimmedActivity,
+			},
+		}
+		activityButtons = append(activityButtons, button)
+	}
+
+	// ✅ สร้างโครงสร้าง Flex Message
+	container := &linebot.BubbleContainer{
+		Type:      linebot.FlexContainerTypeBubble,
+		Size:      linebot.FlexBubbleSizeTypeMega,
+		Direction: linebot.FlexBubbleDirectionTypeLTR,
+		Header: &linebot.BoxComponent{
+			Type:   linebot.FlexComponentTypeBox,
+			Layout: linebot.FlexBoxLayoutTypeVertical,
+			Contents: []linebot.FlexComponent{
+				&linebot.TextComponent{
+					Type:   linebot.FlexComponentTypeText,
+					Text:   "เลือกกิจกรรม",
+					Weight: linebot.FlexTextWeightTypeBold,
+					Size:   linebot.FlexTextSizeTypeXl,
+					Color:  "#FFFFFF",
+					Align:  linebot.FlexComponentAlignTypeCenter,
+				},
+			},
+			BackgroundColor: "#00bcd4",
+		},
+		Body: &linebot.BoxComponent{
+			Type:   linebot.FlexComponentTypeBox,
+			Layout: linebot.FlexBoxLayoutTypeVertical,
+			Spacing: linebot.FlexComponentSpacingTypeMd,
+			Contents: append([]linebot.FlexComponent{
+				&linebot.TextComponent{
+					Type:   linebot.FlexComponentTypeText,
+					Text:   "กรุณาเลือกกิจกรรมที่ต้องการบันทึก:",
+					Size:   linebot.FlexTextSizeTypeMd,
+					Align:  linebot.FlexComponentAlignTypeStart,
+					Wrap:   true,
+				},
+			}, activityButtons...),
+		},
+	}
+
+	return linebot.NewFlexMessage("เลือกกิจกรรม", container)
+}
+
+
+
+// ฟังก์ชันสร้างแถวข้อความ
 func createTextRow(label string, value string) *linebot.BoxComponent {
 	return &linebot.BoxComponent{
 		Type:   linebot.FlexComponentTypeBox,
@@ -573,15 +854,15 @@ func FormatServiceInfo(activity []models.Activityrecord) *linebot.FlexMessage {
 					Margin: linebot.FlexComponentMarginTypeXs,
 				},
 
-				&linebot.TextComponent{
-					Type:   linebot.FlexComponentTypeText,
-					Text:   "เลขประจำตัวประชาชน: \n" + activity[0].PatientInfo.CardID,
-					Weight: linebot.FlexTextWeightTypeRegular,
-					Size:   linebot.FlexTextSizeTypeSm,
-					Color:  "#FFFFFF",
-					Align:  linebot.FlexComponentAlignTypeStart,
-					Margin: linebot.FlexComponentMarginTypeXs,
-				},
+				// &linebot.TextComponent{
+				// 	Type:   linebot.FlexComponentTypeText,
+				// 	Text:   "เลขประจำตัวประชาชน: \n" + activity[0].PatientInfo.CardID,
+				// 	Weight: linebot.FlexTextWeightTypeRegular,
+				// 	Size:   linebot.FlexTextSizeTypeSm,
+				// 	Color:  "#FFFFFF",
+				// 	Align:  linebot.FlexComponentAlignTypeStart,
+				// 	Margin: linebot.FlexComponentMarginTypeXs,
+				// },
 			},
 			BackgroundColor: "#00bcd4",
 		},
@@ -715,26 +996,21 @@ func FormatactivityRecordStarttime(activityRecord *models.Activityrecord) *lineb
 	if activityRecord == nil {
 		return nil
 	}
-	// สร้าง BubbleContainer สำหรับ Flex Message
+
+	// ใช้เวลาเริ่มต้นปัจจุบัน
+	// startTime := time.Now().Format("15:04 น.")
+
 	container := &linebot.BubbleContainer{
 		Type:      linebot.FlexContainerTypeBubble,
-		Size:      linebot.FlexBubbleSizeTypeMega,
 		Direction: linebot.FlexBubbleDirectionTypeLTR,
+		Size:      linebot.FlexBubbleSizeTypeMega,
 		Header: &linebot.BoxComponent{
 			Type:   linebot.FlexComponentTypeBox,
 			Layout: linebot.FlexBoxLayoutTypeVertical,
 			Contents: []linebot.FlexComponent{
 				&linebot.TextComponent{
 					Type:   linebot.FlexComponentTypeText,
-					Text:   fmt.Sprintf("บันทึกกิจกรรม"),
-					Weight: linebot.FlexTextWeightTypeBold,
-					Size:   linebot.FlexTextSizeTypeLg,
-					Color:  "#FFFFFF",
-					Align:  linebot.FlexComponentAlignTypeCenter,
-				},
-				&linebot.TextComponent{
-					Type:   linebot.FlexComponentTypeText,
-					Text:   fmt.Sprintf(activityRecord.ServiceInfo.Activity),
+					Text:   "กิจกรรมเริ่มต้นแล้ว!",
 					Weight: linebot.FlexTextWeightTypeBold,
 					Size:   linebot.FlexTextSizeTypeLg,
 					Color:  "#FFFFFF",
@@ -743,346 +1019,239 @@ func FormatactivityRecordStarttime(activityRecord *models.Activityrecord) *lineb
 			},
 			BackgroundColor: "#00bcd4",
 		},
-		// Header: &linebot.BoxComponent{
-		// 	Type:   linebot.FlexComponentTypeBox,
-		// 	Layout: linebot.FlexBoxLayoutTypeVertical,
-		// 	Contents: []linebot.FlexComponent{
-		// 		&linebot.TextComponent{
-		// 			Type:   linebot.FlexComponentTypeText,
-		// 			Text:   fmt.Sprintf("บันทึกกิจกรรม: %s", endtime[0].ServiceInfo.Activity),
-		// 			Weight: linebot.FlexTextWeightTypeBold,
-		// 			Size:   linebot.FlexTextSizeTypeLg,
-		// 			Color:  "#F8F8FF",
-		// 			Align:  linebot.FlexComponentAlignTypeCenter,
-		// 		},
-		// 	},
-		// 	BackgroundColor: "#00bcd4",
-		// },
 		Body: &linebot.BoxComponent{
 			Type:   linebot.FlexComponentTypeBox,
 			Layout: linebot.FlexBoxLayoutTypeVertical,
 			Contents: []linebot.FlexComponent{
-				// &linebot.BoxComponent{
-				// 	Type:   linebot.FlexComponentTypeBox,
-				// 	Layout: linebot.FlexBoxLayoutTypeVertical,
-				// 	Contents: []linebot.FlexComponent{
-				// 		&linebot.TextComponent{
-				// 			Type:   linebot.FlexComponentTypeText,
-				// 			Text:   "ซุโดกุ",
-				// 			Weight: linebot.FlexTextWeightTypeBold,
-				// 			Size:   linebot.FlexTextSizeTypeLg,
-				// 			Align:  linebot.FlexComponentAlignTypeCenter,
-				// 			Margin: linebot.FlexComponentMarginTypeSm,
-				// 		},
-				// 	},
-				// },
-				// &linebot.BoxComponent{
-				// 	Type:   linebot.FlexComponentTypeBox,
-				// 	Layout: linebot.FlexBoxLayoutTypeVertical,
-				// 	Margin: linebot.FlexComponentMarginTypeSm,
-				// 	Contents: []linebot.FlexComponent{
-				// 		&linebot.TextComponent{
-				// 			Type:   linebot.FlexComponentTypeText,
-				// 			Text:   "นางทองสุก สุขศรี",
-				// 			Weight: linebot.FlexTextWeightTypeBold,
-				// 			Size:   linebot.FlexTextSizeTypeLg,
-				// 			Align:  linebot.FlexComponentAlignTypeCenter,
-				// 		},
-				// 	},
-				// },
-				&linebot.BoxComponent{
-					Type:   linebot.FlexComponentTypeBox,
-					Layout: linebot.FlexBoxLayoutTypeHorizontal,
-					Margin: linebot.FlexComponentMarginTypeMd,
-					Contents: []linebot.FlexComponent{
-						&linebot.BoxComponent{
-							Type:   linebot.FlexComponentTypeBox,
-							Layout: linebot.FlexBoxLayoutTypeVertical, // ใช้ Vertical Layout
-							Margin: linebot.FlexComponentMarginTypeMd,
-							Contents: []linebot.FlexComponent{
-								// ข้อความ "เริ่มบันทึกกิจกรรมที่:"
-								// &linebot.TextComponent{
-								// 	Type:   linebot.FlexComponentTypeText,
-								// 	Text:   "เริ่มบันทึกกิจกรรม",
-								// 	Weight: linebot.FlexTextWeightTypeRegular,
-								// 	Size:   linebot.FlexTextSizeTypeMd,
-								// 	Color:  "#212121",
-								// 	Align:  linebot.FlexComponentAlignTypeCenter,
-								// 	Margin: linebot.FlexComponentMarginTypeSm,
-								// },
-								&linebot.TextComponent{
-									Type:   linebot.FlexComponentTypeText,
-									Text:   "เริ่มที่ " + getCurrentTime(),
-									Weight: linebot.FlexTextWeightTypeRegular,
-									Size:   linebot.FlexTextSizeTypeMd,
-									Color:  "#212121",
-									Align:  linebot.FlexComponentAlignTypeCenter,
-									Margin: linebot.FlexComponentMarginTypeNone, // ไม่ต้องการระยะห่าง
-								},
-								&linebot.SeparatorComponent{
-									Type:   linebot.FlexComponentTypeSeparator,
-									Color:  "#58BDCF",
-									Margin: linebot.FlexComponentMarginTypeXl,
-								},
-								&linebot.TextComponent{
-									Type:   linebot.FlexComponentTypeText,
-									Text:   "กรุณากดปุ่ม \"เสร็จสิ้น\" เมื่อทำกิจกรรมเสร็จ",
-									Size:   linebot.FlexTextSizeTypeSm,
-									Margin: linebot.FlexComponentMarginTypeSm,
-									Wrap:   true,
-									// Decoration: linebot.FlexTextDecorationTypeUnderline,
-								},
-							},
-						},
-						// &linebot.TextComponent{
-						// 	Type:   linebot.FlexComponentTypeText,
-						// 	Text:   "เริ่ม:",
-						// 	Align:  linebot.FlexComponentAlignTypeEnd,
-						// },
-						// &linebot.TextComponent{
-						// 	Type: linebot.FlexComponentTypeText,
-						// 	Text: "25-02-02 10:00:00",
-						// 	Flex: linebot.IntPtr(2),
-						// },
-					},
+				&linebot.TextComponent{
+					Type:   linebot.FlexComponentTypeText,
+					Text:   "กิจกรรม: "+ activityRecord.ActivityOther,
+					Weight: linebot.FlexTextWeightTypeBold,
+					Size:   linebot.FlexTextSizeTypeMd,
+					Align:  linebot.FlexComponentAlignTypeCenter,
+					Color:  "#212121",
+					Wrap:   true,
 				},
-				// &linebot.BoxComponent{
-				// 	Type:   linebot.FlexComponentTypeBox,
-				// 	Layout: linebot.FlexBoxLayoutTypeVertical,
-				// 	Margin: linebot.FlexComponentMarginTypeMd,
-				// 	Contents: []linebot.FlexComponent{
-				// 		&linebot.TextComponent{
-				// 			Type:       linebot.FlexComponentTypeText,
-				// 			Text:       "กรุณากดปุ่ม \"เสร็จสิ้น\" เมื่อทำกิจกรรมเสร็จ",
-				// 			Margin:     linebot.FlexComponentMarginTypeSm,
-				// 			Wrap:       true,
-				// 			Decoration: linebot.FlexTextDecorationTypeUnderline,
-				// 		},
-				// 	},
-				// },
+				&linebot.SeparatorComponent{
+					Type:   linebot.FlexComponentTypeSeparator,
+					Margin: linebot.FlexComponentMarginTypeMd,
+				},
+				&linebot.TextComponent{
+					Type:   linebot.FlexComponentTypeText,
+					Text:   "เวลาเริ่มต้น: "+ getCurrentTime(),
+					Weight: linebot.FlexTextWeightTypeRegular,
+					Size:   linebot.FlexTextSizeTypeMd,
+					Color:  "#212121",
+					Align:  linebot.FlexComponentAlignTypeCenter,
+					Margin: linebot.FlexComponentMarginTypeMd,
+				},
+				&linebot.TextComponent{
+					Type:   linebot.FlexComponentTypeText,
+					Text:   "กรุณากดปุ่ม \"เสร็จสิ้น\" เมื่อทำกิจกรรมเสร็จ",
+					Size:   linebot.FlexTextSizeTypeSm,
+					Align:  linebot.FlexComponentAlignTypeCenter,
+					Wrap:   true,
+				},
 			},
 		},
 		Footer: &linebot.BoxComponent{
 			Type:   linebot.FlexComponentTypeBox,
 			Layout: linebot.FlexBoxLayoutTypeHorizontal,
 			Contents: []linebot.FlexComponent{
-				&linebot.BoxComponent{
-					Type:   linebot.FlexComponentTypeBox,
-					Layout: linebot.FlexBoxLayoutTypeVertical,
-					Margin: linebot.FlexComponentMarginTypeXs,
-					Contents: []linebot.FlexComponent{
-						&linebot.ButtonComponent{
-							Type: linebot.FlexComponentTypeButton,
-							Action: &linebot.MessageAction{
-								Label: "เสร็จสิ้น",
-								Text:  "เสร็จสิ้น",
-							},
-							Margin: linebot.FlexComponentMarginTypeXs,
-							Height: linebot.FlexButtonHeightTypeMd,
-							Style:  linebot.FlexButtonStyleTypePrimary,
-						},
-					},
+				&linebot.ButtonComponent{
+					Type:   linebot.FlexComponentTypeButton,
+					Action: &linebot.MessageAction{Label: "เสร็จสิ้น", Text: "เสร็จสิ้น"},
+					Style:  linebot.FlexButtonStyleTypePrimary,
 				},
 			},
 		},
 	}
-	// เพิ่ม Quick Reply ใน Flex Message
-	// quickReply := linebot.NewQuickReplyItems(
-	// 	linebot.NewQuickReplyButton("", linebot.NewMessageAction("ยกเลิก", "ยกเลิก")),
-	// 	linebot.NewQuickReplyButton("", linebot.NewMessageAction("เสร็จสิ้น", "เสร็จสิ้น")),
-	// )
 
-	// สร้าง Flex Message พร้อม Quick Reply
-	flexMessage := linebot.NewFlexMessage("เริ่มบันทึกกิจกรรม", container)
-	// flexMessage = flexMessage.WithQuickReplies(quickReply).(*linebot.FlexMessage)
-
-	return flexMessage
-
-	// สร้าง Flex Message
-	// return linebot.NewFlexMessage("เริ่มบันทึกกิจกรรม", container)
+	return linebot.NewFlexMessage("กิจกรรมเริ่มต้นแล้ว", container)
 }
-func FormatactivityRecordEndtime(endtime []models.Activityrecord) *linebot.FlexMessage {
-	if endtime == nil {
-		return nil
-	}
-	// สร้าง BubbleContainer สำหรับข้อความ Flex Message
-	container := &linebot.BubbleContainer{
-		Type:      linebot.FlexContainerTypeBubble,
-		Size:      linebot.FlexBubbleSizeTypeMega,
-		Direction: linebot.FlexBubbleDirectionTypeLTR,
-		Header: &linebot.BoxComponent{
-			Type:   linebot.FlexComponentTypeBox,
-			Layout: linebot.FlexBoxLayoutTypeVertical,
-			Contents: []linebot.FlexComponent{
-				&linebot.TextComponent{
-					Type:   linebot.FlexComponentTypeText,
-					Text:   fmt.Sprintf("บันทึกกิจกรรม: %s", endtime[0].ServiceInfo.Activity),
-					Weight: linebot.FlexTextWeightTypeBold,
-					Size:   linebot.FlexTextSizeTypeLg,
-					Color:  "#FFFFFF",
-					Align:  linebot.FlexComponentAlignTypeCenter,
-				},
-			},
 
-			BackgroundColor: "#00bcd4",
-		},
-		Body: &linebot.BoxComponent{
-			Type:   linebot.FlexComponentTypeBox,
-			Layout: linebot.FlexBoxLayoutTypeVertical,
-			Contents: []linebot.FlexComponent{
-				&linebot.TextComponent{
-					Type:   linebot.FlexComponentTypeText,
-					Text:   endtime[0].PatientInfo.Name,
-					Weight: linebot.FlexTextWeightTypeBold,
-					Size:   linebot.FlexTextSizeTypeMd,
-					Color:  "#212121",
-					Align:  linebot.FlexComponentAlignTypeCenter,
-					Margin: linebot.FlexComponentMarginTypeXs,
-				},
-				// เลขประจำตัวประชาชน
-				&linebot.TextComponent{
-					Type:   linebot.FlexComponentTypeText,
-					Text:   "เลขประจำตัวประชาชน: " + endtime[0].PatientInfo.CardID,
-					Weight: linebot.FlexTextWeightTypeRegular,
-					Size:   linebot.FlexTextSizeTypeSm,
-					Color:  "#212121",
-					Align:  linebot.FlexComponentAlignTypeCenter,
-					Margin: linebot.FlexComponentMarginTypeNone,
-				},
-				&linebot.SeparatorComponent{
-					Type:   linebot.FlexComponentTypeSeparator,
-					Color:  "#58BDCF",
-					Margin: linebot.FlexComponentMarginTypeXl,
-				},
-				// กิจกรรมที่ทำ
-				// &linebot.BoxComponent{
-				// 	Type:   linebot.FlexComponentTypeBox,
-				// 	Layout: linebot.FlexBoxLayoutTypeVertical,
-				// 	Contents: []linebot.FlexComponent{
-				// 		&linebot.TextComponent{
-				// 			Type:   linebot.FlexComponentTypeText,
-				// 			Text:   endtime[0].ServiceInfo.Activity,
-				// 			Weight: linebot.FlexTextWeightTypeBold,
-				// 			Size:   linebot.FlexTextSizeTypeMd,
-				// 			Color:  "#212121",
-				// 			Align:  linebot.FlexComponentAlignTypeCenter,
-				// 		},
-				// 	},
-				// },
-				// วันที่และเวลา
-				// &linebot.TextComponent{
-				// 	Type:   linebot.FlexComponentTypeText,
-				// 	Text:   "เสร็จสิ้นเมื่อ",
-				// 	Weight: linebot.FlexTextWeightTypeRegular,
-				// 	Size:   linebot.FlexTextSizeTypeMd,
-				// 	Color:  "#212121",
-				// 	Align:  linebot.FlexComponentAlignTypeCenter,
-				// 	Margin: linebot.FlexComponentMarginTypeLg,
-				// },
-				&linebot.TextComponent{
-					Type:   linebot.FlexComponentTypeText,
-					Text:   "วันที่: " + getCurrentTime(),
-					Weight: linebot.FlexTextWeightTypeRegular,
-					Size:   linebot.FlexTextSizeTypeSm,
-					Color:  "#212121",
-					Align:  linebot.FlexComponentAlignTypeStart,
-					Margin: linebot.FlexComponentMarginTypeXl,
-				}, &linebot.TextComponent{
-					Type:   linebot.FlexComponentTypeText,
-					Text:   "ระยะเวลา: " + endtime[0].Period,
-					Weight: linebot.FlexTextWeightTypeRegular,
-					Size:   linebot.FlexTextSizeTypeSm,
-					Color:  "#212121",
-					Align:  linebot.FlexComponentAlignTypeStart,
-					Margin: linebot.FlexComponentMarginTypeXs,
-				},
-				// createTextRow("วันที่ ", getCurrentTime()),
-				// createTextRow("ระยะเวลา ", endtime[0].Period),
-				// &linebot.TextComponent{
-				// 	Type:   linebot.FlexComponentTypeText,
-				// 	Text:   "วันที่ " + getCurrentTime(),
-				// 	Weight: linebot.FlexTextWeightTypeRegular,
-				// 	Size:   linebot.FlexTextSizeTypeMd,
-				// 	Color:  "#212121",
-				// 	Align:  linebot.FlexComponentAlignTypeCenter,
-				// 	Margin: linebot.FlexComponentMarginTypeNone, // ไม่ต้องการระยะห่าง
-				// },
-				&linebot.BoxComponent{
-					Type:   linebot.FlexComponentTypeBox,
-					Layout: linebot.FlexBoxLayoutTypeVertical,
-					Contents: []linebot.FlexComponent{
-						// &linebot.TextComponent{
-						// 	Type:   linebot.FlexComponentTypeText,
-						// 	Text:   "ระยะเวลาในการทำกิจกรรม",
-						// 	Weight: linebot.FlexTextWeightTypeRegular,
-						// 	Size:   linebot.FlexTextSizeTypeSm,
-						// 	Color:  "#212121",
-						// 	Align:  linebot.FlexComponentAlignTypeCenter,
-						// 	Margin: linebot.FlexComponentMarginTypeMd,
-						// },
-						// &linebot.TextComponent{
-						// 	Type:   linebot.FlexComponentTypeText,
-						// 	Text:   endtime[0].Period,
-						// 	Weight: linebot.FlexTextWeightTypeRegular,
-						// 	Size:   linebot.FlexTextSizeTypeMd,
-						// 	Color:  "#212121",
-						// 	Align:  linebot.FlexComponentAlignTypeCenter,
-						// 	Margin: linebot.FlexComponentMarginTypeXs,
-						// },
-						&linebot.SeparatorComponent{
-							Type:   linebot.FlexComponentTypeSeparator,
-							Color:  "#58BDCF",
-							Margin: linebot.FlexComponentMarginTypeXl,
-						},
-						&linebot.TextComponent{
-							Type:   linebot.FlexComponentTypeText,
-							Text:   "!!!สำเร็จ!!!",
-							Weight: linebot.FlexTextWeightTypeBold,
-							Size:   linebot.FlexTextSizeTypeMd,
-							Color:  "#212121",
-							Align:  linebot.FlexComponentAlignTypeCenter,
-							Margin: linebot.FlexComponentMarginTypeSm,
-						},
-					},
-				},
-				// // สถานที่
-				// &linebot.BoxComponent{
-				// 	Type:   linebot.FlexComponentTypeBox,
-				// 	Layout: linebot.FlexBoxLayoutTypeHorizontal,
-				// 	Margin: linebot.FlexComponentMarginTypeLg,
-				// 	Contents: []linebot.FlexComponent{
-				// 		&linebot.TextComponent{
-				// 			Type:   linebot.FlexComponentTypeText,
-				// 			Text:   "สถานที่:",
-				// 			Align:  linebot.FlexComponentAlignTypeEnd,
-				// 		},
-				// 		&linebot.TextComponent{
-				// 			Type:   linebot.FlexComponentTypeText,
-				// 			Text:   "บ้านผู้สูงอายุ",
-				// 			Align:  linebot.FlexComponentAlignTypeStart,
-				// 		},
-				// 	},
-				// },
-				// // รูปภาพ
-				// &linebot.BoxComponent{
-				// 	Type:   linebot.FlexComponentTypeBox,
-				// 	Layout: linebot.FlexBoxLayoutTypeVertical,
-				// 	Contents: []linebot.FlexComponent{
-				// 		&linebot.ImageComponent{
-				// 			Type:  linebot.FlexComponentTypeImage,
-				// 			URL:   "https://www.yanheenursinghome.com/wp-content/uploads/2023/07/ART_0196.jpg",
-				// 			Align: linebot.FlexComponentAlignTypeCenter,
-				// 			Size:  linebot.FlexImageSizeTypeFull,
-				// 		},
-				// 	},
-				// },
-			},
-		},
-	}
+// func FormatactivityRecordEndtime(endtime []models.Activityrecord) *linebot.FlexMessage {
+// 	if endtime == nil {
+// 		return nil
+// 	}
+// 	// สร้าง BubbleContainer สำหรับข้อความ Flex Message
+// 	container := &linebot.BubbleContainer{
+// 		Type:      linebot.FlexContainerTypeBubble,
+// 		Size:      linebot.FlexBubbleSizeTypeMega,
+// 		Direction: linebot.FlexBubbleDirectionTypeLTR,
+// 		Header: &linebot.BoxComponent{
+// 			Type:   linebot.FlexComponentTypeBox,
+// 			Layout: linebot.FlexBoxLayoutTypeVertical,
+// 			Contents: []linebot.FlexComponent{
+// 				&linebot.TextComponent{
+// 					Type:   linebot.FlexComponentTypeText,
+// 					Text:   fmt.Sprintf("บันทึกกิจกรรม: %s", endtime[0].ServiceInfo.Activity),
+// 					Weight: linebot.FlexTextWeightTypeBold,
+// 					Size:   linebot.FlexTextSizeTypeLg,
+// 					Color:  "#FFFFFF",
+// 					Align:  linebot.FlexComponentAlignTypeCenter,
+// 				},
+// 			},
 
-	// สร้างและส่ง Flex Message
-	return linebot.NewFlexMessage("บันทึกกิจกรรม", container)
-}
+// 			BackgroundColor: "#00bcd4",
+// 		},
+// 		Body: &linebot.BoxComponent{
+// 			Type:   linebot.FlexComponentTypeBox,
+// 			Layout: linebot.FlexBoxLayoutTypeVertical,
+// 			Contents: []linebot.FlexComponent{
+// 				&linebot.TextComponent{
+// 					Type:   linebot.FlexComponentTypeText,
+// 					Text:   endtime[0].PatientInfo.Name,
+// 					Weight: linebot.FlexTextWeightTypeBold,
+// 					Size:   linebot.FlexTextSizeTypeMd,
+// 					Color:  "#212121",
+// 					Align:  linebot.FlexComponentAlignTypeCenter,
+// 					Margin: linebot.FlexComponentMarginTypeXs,
+// 				},
+// 				// เลขประจำตัวประชาชน
+// 				&linebot.TextComponent{
+// 					Type:   linebot.FlexComponentTypeText,
+// 					Text:   "เลขประจำตัวประชาชน: " + endtime[0].PatientInfo.CardID,
+// 					Weight: linebot.FlexTextWeightTypeRegular,
+// 					Size:   linebot.FlexTextSizeTypeSm,
+// 					Color:  "#212121",
+// 					Align:  linebot.FlexComponentAlignTypeCenter,
+// 					Margin: linebot.FlexComponentMarginTypeNone,
+// 				},
+// 				&linebot.SeparatorComponent{
+// 					Type:   linebot.FlexComponentTypeSeparator,
+// 					Color:  "#58BDCF",
+// 					Margin: linebot.FlexComponentMarginTypeXl,
+// 				},
+// 				// กิจกรรมที่ทำ
+// 				// &linebot.BoxComponent{
+// 				// 	Type:   linebot.FlexComponentTypeBox,
+// 				// 	Layout: linebot.FlexBoxLayoutTypeVertical,
+// 				// 	Contents: []linebot.FlexComponent{
+// 				// 		&linebot.TextComponent{
+// 				// 			Type:   linebot.FlexComponentTypeText,
+// 				// 			Text:   endtime[0].ServiceInfo.Activity,
+// 				// 			Weight: linebot.FlexTextWeightTypeBold,
+// 				// 			Size:   linebot.FlexTextSizeTypeMd,
+// 				// 			Color:  "#212121",
+// 				// 			Align:  linebot.FlexComponentAlignTypeCenter,
+// 				// 		},
+// 				// 	},
+// 				// },
+// 				// วันที่และเวลา
+// 				// &linebot.TextComponent{
+// 				// 	Type:   linebot.FlexComponentTypeText,
+// 				// 	Text:   "เสร็จสิ้นเมื่อ",
+// 				// 	Weight: linebot.FlexTextWeightTypeRegular,
+// 				// 	Size:   linebot.FlexTextSizeTypeMd,
+// 				// 	Color:  "#212121",
+// 				// 	Align:  linebot.FlexComponentAlignTypeCenter,
+// 				// 	Margin: linebot.FlexComponentMarginTypeLg,
+// 				// },
+// 				&linebot.TextComponent{
+// 					Type:   linebot.FlexComponentTypeText,
+// 					Text:   "วันที่: " + getCurrentTime(),
+// 					Weight: linebot.FlexTextWeightTypeRegular,
+// 					Size:   linebot.FlexTextSizeTypeSm,
+// 					Color:  "#212121",
+// 					Align:  linebot.FlexComponentAlignTypeStart,
+// 					Margin: linebot.FlexComponentMarginTypeXl,
+// 				}, &linebot.TextComponent{
+// 					Type:   linebot.FlexComponentTypeText,
+// 					Text:   "ระยะเวลา: " + endtime[0].Period,
+// 					Weight: linebot.FlexTextWeightTypeRegular,
+// 					Size:   linebot.FlexTextSizeTypeSm,
+// 					Color:  "#212121",
+// 					Align:  linebot.FlexComponentAlignTypeStart,
+// 					Margin: linebot.FlexComponentMarginTypeXs,
+// 				},
+// 				// createTextRow("วันที่ ", getCurrentTime()),
+// 				// createTextRow("ระยะเวลา ", endtime[0].Period),
+// 				// &linebot.TextComponent{
+// 				// 	Type:   linebot.FlexComponentTypeText,
+// 				// 	Text:   "วันที่ " + getCurrentTime(),
+// 				// 	Weight: linebot.FlexTextWeightTypeRegular,
+// 				// 	Size:   linebot.FlexTextSizeTypeMd,
+// 				// 	Color:  "#212121",
+// 				// 	Align:  linebot.FlexComponentAlignTypeCenter,
+// 				// 	Margin: linebot.FlexComponentMarginTypeNone, // ไม่ต้องการระยะห่าง
+// 				// },
+// 				&linebot.BoxComponent{
+// 					Type:   linebot.FlexComponentTypeBox,
+// 					Layout: linebot.FlexBoxLayoutTypeVertical,
+// 					Contents: []linebot.FlexComponent{
+// 						// &linebot.TextComponent{
+// 						// 	Type:   linebot.FlexComponentTypeText,
+// 						// 	Text:   "ระยะเวลาในการทำกิจกรรม",
+// 						// 	Weight: linebot.FlexTextWeightTypeRegular,
+// 						// 	Size:   linebot.FlexTextSizeTypeSm,
+// 						// 	Color:  "#212121",
+// 						// 	Align:  linebot.FlexComponentAlignTypeCenter,
+// 						// 	Margin: linebot.FlexComponentMarginTypeMd,
+// 						// },
+// 						// &linebot.TextComponent{
+// 						// 	Type:   linebot.FlexComponentTypeText,
+// 						// 	Text:   endtime[0].Period,
+// 						// 	Weight: linebot.FlexTextWeightTypeRegular,
+// 						// 	Size:   linebot.FlexTextSizeTypeMd,
+// 						// 	Color:  "#212121",
+// 						// 	Align:  linebot.FlexComponentAlignTypeCenter,
+// 						// 	Margin: linebot.FlexComponentMarginTypeXs,
+// 						// },
+// 						&linebot.SeparatorComponent{
+// 							Type:   linebot.FlexComponentTypeSeparator,
+// 							Color:  "#58BDCF",
+// 							Margin: linebot.FlexComponentMarginTypeXl,
+// 						},
+// 						&linebot.TextComponent{
+// 							Type:   linebot.FlexComponentTypeText,
+// 							Text:   "!!!สำเร็จ!!!",
+// 							Weight: linebot.FlexTextWeightTypeBold,
+// 							Size:   linebot.FlexTextSizeTypeMd,
+// 							Color:  "#212121",
+// 							Align:  linebot.FlexComponentAlignTypeCenter,
+// 							Margin: linebot.FlexComponentMarginTypeSm,
+// 						},
+// 					},
+// 				},
+// 				// // สถานที่
+// 				// &linebot.BoxComponent{
+// 				// 	Type:   linebot.FlexComponentTypeBox,
+// 				// 	Layout: linebot.FlexBoxLayoutTypeHorizontal,
+// 				// 	Margin: linebot.FlexComponentMarginTypeLg,
+// 				// 	Contents: []linebot.FlexComponent{
+// 				// 		&linebot.TextComponent{
+// 				// 			Type:   linebot.FlexComponentTypeText,
+// 				// 			Text:   "สถานที่:",
+// 				// 			Align:  linebot.FlexComponentAlignTypeEnd,
+// 				// 		},
+// 				// 		&linebot.TextComponent{
+// 				// 			Type:   linebot.FlexComponentTypeText,
+// 				// 			Text:   "บ้านผู้สูงอายุ",
+// 				// 			Align:  linebot.FlexComponentAlignTypeStart,
+// 				// 		},
+// 				// 	},
+// 				// },
+// 				// // รูปภาพ
+// 				// &linebot.BoxComponent{
+// 				// 	Type:   linebot.FlexComponentTypeBox,
+// 				// 	Layout: linebot.FlexBoxLayoutTypeVertical,
+// 				// 	Contents: []linebot.FlexComponent{
+// 				// 		&linebot.ImageComponent{
+// 				// 			Type:  linebot.FlexComponentTypeImage,
+// 				// 			URL:   "https://www.yanheenursinghome.com/wp-content/uploads/2023/07/ART_0196.jpg",
+// 				// 			Align: linebot.FlexComponentAlignTypeCenter,
+// 				// 			Size:  linebot.FlexImageSizeTypeFull,
+// 				// 		},
+// 				// 	},
+// 				// },
+// 			},
+// 		},
+// 	}
+
+// 	// สร้างและส่ง Flex Message
+// 	return linebot.NewFlexMessage("บันทึกกิจกรรม", container)
+// }
 
 func FormatConfirmationCheckIn(worktimeRecord *models.WorktimeRecord) *linebot.FlexMessage {
 	if worktimeRecord == nil {

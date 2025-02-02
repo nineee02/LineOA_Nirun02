@@ -1,7 +1,6 @@
 package main
 
 import (
-	// ถ้าฟังก์ชัน HandleLineWebhook อยู่ใน pkg/hook
 	"log"
 	"nirun/pkg/event"
 	"nirun/pkg/hook"

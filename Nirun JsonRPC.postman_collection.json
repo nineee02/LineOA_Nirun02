@@ -1,0 +1,334 @@
+{
+	"info": {
+		"_postman_id": "d7903d43-2cad-49f7-a35b-dc1e82d8b5b8",
+		"name": "Nirun JsonRPC",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "205774"
+	},
+	"item": [
+		{
+			"name": "GET Patient",
+			"request": {
+				"auth": {
+					"type": "noauth"
+				},
+				"method": "POST",
+				"header": [
+					{
+						"key": "Cookie",
+						"value": "session_id=577abe074ee1899f7d82953d8da347f4bf4e6ffc",
+						"type": "text",
+						"disabled": true
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"jsonrpc\": \"2.0\",\r\n    \"method\": \"call\",\r\n    \"params\": {\r\n        \"service\": \"object\",\r\n        \"method\": \"execute_kw\",\r\n        \"args\": [\r\n            \"{{db_name}}\",\r\n            {{user_id}},\r\n            \"{{pass}}\",\r\n            \"ni.patient\", // Model name e.g. res.users,\r\n            \"search_read\", // Method to call e.g. \"search_read\",\"create\", \"write\"(update), \"unlink\"(\"delete\")\r\n            [\r\n                [], // filter domain empty array [] to get all record\r\n                [\r\n                    \"name\",\r\n                    \"title\",\r\n                    \"identification_id\",\r\n                    \"gender\",\r\n                    \"birthdate\",\r\n                    \"deceased_date\",\r\n                    \"age\",\r\n                    \"phone\",\r\n                    \"mobile\",\r\n                    \"create_date\",\r\n                    \"create_uid\",\r\n                    \"write_date\",\r\n                    \"write_uid\"\r\n                ] //fields name to read - empty array[] to get all fields\r\n            ],\r\n            {\"limit\": 80, \"offset\": 2, \"order\": \"birthdate\"}\r\n        ]\r\n    },\r\n    \"id\": {{$randomInt}} //request id for reference\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{url}}/jsonrpc",
+					"host": [
+						"{{url}}"
+					],
+					"path": [
+						"jsonrpc"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "GET Patient by ID",
+			"request": {
+				"auth": {
+					"type": "noauth"
+				},
+				"method": "POST",
+				"header": [
+					{
+						"key": "Cookie",
+						"value": "session_id=577abe074ee1899f7d82953d8da347f4bf4e6ffc",
+						"type": "text",
+						"disabled": true
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"jsonrpc\": \"2.0\",\r\n    \"method\": \"call\",\r\n    \"params\": {\r\n        \"service\": \"object\",\r\n        \"method\": \"execute_kw\",\r\n        \"args\": [\r\n            \"{{db_name}}\",\r\n            {{user_id}},\r\n            \"{{pass}}\",\r\n            \"ni.patient\", // Model name e.g. res.users,\r\n            \"search_read\", // Method to call e.g. \"search_read\",\"create\", \"write\"(update), \"unlink\"(\"delete\")\r\n            [\r\n                [[\"id\", \"in\", [177, 178]]], // filter domain empty array [] to get all record\r\n                [\r\n                    \"name\",\r\n                    \"title\",\r\n                    \"identification_id\",\r\n                    \"gender\",\r\n                    \"birthdate\",\r\n                    \"deceased_date\",\r\n                    \"age\",\r\n                    \"phone\",\r\n                    \"mobile\",\r\n                    \"create_date\",\r\n                    \"create_uid\",\r\n                    \"write_date\",\r\n                    \"write_uid\"\r\n                ] //fields name to read - empty array[] to get all fields\r\n            ]\r\n        ]\r\n    },\r\n    \"id\": {{$randomInt}} //request id for reference\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{url}}/jsonrpc",
+					"host": [
+						"{{url}}"
+					],
+					"path": [
+						"jsonrpc"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "GET Service",
+			"request": {
+				"auth": {
+					"type": "noauth"
+				},
+				"method": "POST",
+				"header": [
+					{
+						"key": "Cookie",
+						"value": "session_id=577abe074ee1899f7d82953d8da347f4bf4e6ffc",
+						"type": "text",
+						"disabled": true
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"jsonrpc\": \"2.0\",\r\n    \"method\": \"call\",\r\n    \"params\": {\r\n        \"service\": \"object\",\r\n        \"method\": \"execute\",\r\n        \"args\": [\r\n            \"{{db_name}}\",\r\n            {{user_id}},\r\n            \"{{pass}}\",\r\n            \"ni.service\", // Model name e.g. res.users,\r\n            \"search_read\", // Method to call e.g. \"search_read\",\"create\", \"write\"(update), \"unlink\"(\"delete\")\r\n            [], // filter domain empty array [] to get all record\r\n            [\"sequence\",\"name\",\"category_id\",  \"create_date\",\"create_uid\",\"write_date\",\"write_uid\"] //fields name to read - empty array[] to get all fields\r\n        ]    \r\n    },\r\n    \"id\": {{$randomInt}}  //request id for reference\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{url}}/jsonrpc",
+					"host": [
+						"{{url}}"
+					],
+					"path": [
+						"jsonrpc"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "GET Service by Category",
+			"request": {
+				"auth": {
+					"type": "noauth"
+				},
+				"method": "POST",
+				"header": [
+					{
+						"key": "Cookie",
+						"value": "session_id=577abe074ee1899f7d82953d8da347f4bf4e6ffc",
+						"type": "text",
+						"disabled": true
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"jsonrpc\": \"2.0\",\r\n    \"method\": \"call\",\r\n    \"params\": {\r\n        \"service\": \"object\",\r\n        \"method\": \"execute_kw\",\r\n        \"args\": [\r\n            \"{{db_name}}\",\r\n            {{user_id}},\r\n            \"{{pass}}\",\r\n            \"ni.service\", // Model name e.g. res.users,\r\n            \"search_read\", // Method to call e.g. \"search_read\",\"create\", \"write\"(update), \"unlink\"(\"delete\")\r\n            [\r\n                [\r\n                    [\r\n                        \"category_id\",\r\n                        \"=\",\r\n                        6\r\n                    ]\r\n                ], // filter domain empty array [] to get all record\r\n                [\r\n                    \"sequence\",\r\n                    \"name\",\r\n                    \"category_id\",\r\n                    \"create_date\",\r\n                    \"create_uid\",\r\n                    \"write_date\",\r\n                    \"write_uid\"\r\n                ] //fields name to read - empty array[] to get all fields\r\n            ]\r\n        ]\r\n    },\r\n    \"id\": {{$randomInt}} //request id for reference\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{url}}/jsonrpc",
+					"host": [
+						"{{url}}"
+					],
+					"path": [
+						"jsonrpc"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "GET Observation Type",
+			"request": {
+				"auth": {
+					"type": "noauth"
+				},
+				"method": "POST",
+				"header": [
+					{
+						"key": "Cookie",
+						"value": "session_id=577abe074ee1899f7d82953d8da347f4bf4e6ffc",
+						"type": "text",
+						"disabled": true
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"jsonrpc\": \"2.0\",\r\n    \"method\": \"call\",\r\n    \"params\": {\r\n        \"service\": \"object\",\r\n        \"method\": \"execute_kw\",\r\n        \"args\": [\r\n            \"{{db_name}}\",\r\n            {{user_id}},\r\n            \"{{pass}}\",\r\n            \"ni.observation.type\", // Model name e.g. res.users,\r\n            \"search_read\", // Method to call e.g. \"search_read\",\"create\", \"write\"(update), \"unlink\"(\"delete\")\r\n            [\r\n                [], // filter domain empty array [] to get all record\r\n                [\r\n                    \"name\",\r\n                    \"code\",\r\n                    \"category_id\",\r\n                    \"min\",\r\n                    \"max\"\r\n                ] //fields name to read - empty array[] to get all fields\r\n            ]\r\n        ]\r\n    },\r\n    \"id\": {{$randomInt}} //request id for reference\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{url}}/jsonrpc",
+					"host": [
+						"{{url}}"
+					],
+					"path": [
+						"jsonrpc"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "GET Observation",
+			"request": {
+				"auth": {
+					"type": "noauth"
+				},
+				"method": "POST",
+				"header": [
+					{
+						"key": "Cookie",
+						"value": "session_id=577abe074ee1899f7d82953d8da347f4bf4e6ffc",
+						"type": "text",
+						"disabled": true
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"jsonrpc\": \"2.0\",\r\n    \"method\": \"call\",\r\n    \"params\": {\r\n        \"service\": \"object\",\r\n        \"method\": \"execute_kw\",\r\n        \"args\": [\r\n            \"{{db_name}}\",\r\n            {{user_id}},\r\n            \"{{pass}}\",\r\n            \"ni.observation\", // Model name e.g. res.users,\r\n            \"search_read\", // Method to call e.g. \"search_read\",\"create\", \"write\"(update), \"unlink\"(\"delete\")\r\n            [\r\n                [], // filter domain empty array [] to get all record\r\n                [\r\n                    \"patient_id\",\r\n                    \"encounter_id\",\r\n                    \"effective_date\",\r\n                    \"type_id\",\r\n                    \"value\",\r\n                    \"interpretation_id\",\r\n                    \"create_date\",\r\n                    \"create_uid\",\r\n                    \"write_date\",\r\n                    \"write_uid\"\r\n                ] //fields name to read - empty array[] to get all fields\r\n            ],\r\n            {\r\n                \"limit\": 80, \"order\": \"effective_date desc\" \r\n            }\r\n        ]\r\n    },\r\n    \"id\": {{$randomInt}} //request id for reference\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{url}}/jsonrpc",
+					"host": [
+						"{{url}}"
+					],
+					"path": [
+						"jsonrpc"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "POST Observation",
+			"request": {
+				"auth": {
+					"type": "noauth"
+				},
+				"method": "POST",
+				"header": [
+					{
+						"key": "Cookie",
+						"value": "session_id=577abe074ee1899f7d82953d8da347f4bf4e6ffc",
+						"type": "text",
+						"disabled": true
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"jsonrpc\": \"2.0\",\r\n    \"method\": \"call\",\r\n    \"params\": {\r\n        \"service\": \"object\",\r\n        \"method\": \"execute_kw\",\r\n        \"args\": [\r\n            \"{{db_name}}\",\r\n            {{user_id}},\r\n            \"{{pass}}\",\r\n            \"ni.observation\", // Model name e.g. res.users,\r\n            \"create\", // Method to call e.g. \"search_read\",\"create\", \"write\"(update), \"unlink\"(\"delete\")\r\n            [\r\n                [\r\n                    {\r\n                        \"occurrence\": \"2052-01-30 10:16:17\",\r\n                        \"patient_id\": 1,\r\n                        \"type_id\": 2,\r\n                        \"value_float\": 130.5\r\n                    },\r\n                    {\r\n                        \"occurrence\": \"2052-01-30 10:16:17\",\r\n                        \"patient_id\": 1,\r\n                        \"type_id\": 3,\r\n                        \"value_float\": 80\r\n                    }\r\n                ]\r\n            ]\r\n        ]\r\n    },\r\n    \"id\": {{$randomInt}} //request id for reference\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{url}}/jsonrpc",
+					"host": [
+						"{{url}}"
+					],
+					"path": [
+						"jsonrpc"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "PUT Observation",
+			"request": {
+				"auth": {
+					"type": "noauth"
+				},
+				"method": "POST",
+				"header": [
+					{
+						"key": "Cookie",
+						"value": "session_id=577abe074ee1899f7d82953d8da347f4bf4e6ffc",
+						"type": "text",
+						"disabled": true
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"jsonrpc\": \"2.0\",\r\n    \"method\": \"call\",\r\n    \"params\": {\r\n        \"service\": \"object\",\r\n        \"method\": \"execute_kw\",\r\n        \"args\": [\r\n            \"{{db_name}}\",\r\n            {{user_id}},\r\n            \"{{pass}}\",\r\n            \"ni.observation\", // Model name e.g. res.users,\r\n            \"write\", // Method to call e.g. \"search_read\",\"create\", \"write\"(update), \"unlink\"(\"delete\")\r\n            [\r\n                [\r\n                    11\r\n                ], // id of record to write (update)\r\n                {\r\n                    \"value_float\": 135.5\r\n                } // value to update\r\n            ]\r\n        ]\r\n    },\r\n    \"id\": {{$randomInt}} //request id for reference\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{url}}/jsonrpc",
+					"host": [
+						"{{url}}"
+					],
+					"path": [
+						"jsonrpc"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "DELETE Observation",
+			"request": {
+				"auth": {
+					"type": "noauth"
+				},
+				"method": "POST",
+				"header": [
+					{
+						"key": "Cookie",
+						"value": "session_id=577abe074ee1899f7d82953d8da347f4bf4e6ffc",
+						"type": "text",
+						"disabled": true
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"jsonrpc\": \"2.0\",\r\n    \"method\": \"call\",\r\n    \"params\": {\r\n        \"service\": \"object\",\r\n        \"method\": \"execute_kw\",\r\n        \"args\": [\r\n            \"{{db_name}}\",\r\n            {{user_id}},\r\n            \"{{pass}}\",\r\n            \"ni.observation\", // Model name e.g. res.users,\r\n            \"unlink\", // Method to call e.g. \"search_read\",\"create\", \"write\"(update), \"unlink\"(\"delete\")\r\n            [\r\n                [\r\n                    17,\r\n                    18\r\n                ] // id of record to unlink (delete)\r\n            ]\r\n        ]\r\n    },\r\n    \"id\": {{$randomInt}} //request id for reference\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{url}}/jsonrpc",
+					"host": [
+						"{{url}}"
+					],
+					"path": [
+						"jsonrpc"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}
