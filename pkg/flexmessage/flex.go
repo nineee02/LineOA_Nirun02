@@ -1,6 +1,7 @@
 package flexmessage
 
 import (
+	"log"
 	"nirun/pkg/models"
 	"strings"
 	"time"
@@ -337,110 +338,179 @@ func FormatworktimeCheckout(worktimeRecord *models.WorktimeRecord) *linebot.Flex
 func intPtr(i int) *int {
 	return &i
 }
-
 func FormatPatientInfo(patient *models.PatientInfo) *linebot.FlexMessage {
+	if patient == nil || patient.Name == "" {
+		log.Println("Error: ไม่พบข้อมูลผู้ป่วย")
+		return linebot.NewFlexMessage("ไม่พบข้อมูล", &linebot.BubbleContainer{
+			Body: &linebot.BoxComponent{
+				Type:   linebot.FlexComponentTypeBox,
+				Layout: linebot.FlexBoxLayoutTypeVertical,
+				Contents: []linebot.FlexComponent{
+					&linebot.TextComponent{
+						Type:  linebot.FlexComponentTypeText,
+						Text:  "ไม่พบข้อมูลผู้ป่วย กรุณาลองใหม่",
+						Size:  linebot.FlexTextSizeTypeMd,
+						Color: "#FF0000",
+						Wrap:  true,
+					},
+				},
+			},
+		})
+	}
+
+	// ตรวจสอบสิทธิการรักษา
+	rightToTreatment := "ไม่มีข้อมูล"
+	if (models.RightToTreatmentInfo{}) != patient.RightToTreatmentInfo {
+		rightToTreatment = getSafeString(&patient.RightToTreatmentInfo.Right_to_treatment, "ไม่มีข้อมูล")
+	}
+
 	// สร้าง BubbleContainer
 	container := &linebot.BubbleContainer{
-		// 	Type: linebot.FlexContainerTypeBubble,
-		// 	Size: linebot.FlexBubbleSizeTypeMega,
-		// 	Hero: &linebot.ImageComponent{
-		// 		Type:        linebot.FlexComponentTypeImage,
-		// 		// URL:         imageUrl, // ใช้ URL ของภาพที่ได้รับจาก MinIO
-		// 		Size:        linebot.FlexImageSizeTypeFull,
-		// 		AspectRatio: "20:13",
-		// 		AspectMode:  "cover",
-		// 	},
-		// Header: &linebot.BoxComponent{
-		// 	Type:   linebot.FlexComponentTypeBox,
-		// 	Layout: linebot.FlexBoxLayoutTypeVertical,
-		// 	Contents: []linebot.FlexComponent{
-		// 		&linebot.TextComponent{
-		// 			Type:   linebot.FlexComponentTypeText,
-		// 			Text:   patient.PatientInfo.Name,
-		// 			Weight: linebot.FlexTextWeightTypeBold,
-		// 			Size:   linebot.FlexTextSizeTypeLg,
-		// 			Color:  "#FFFFFF",
-		// 			Align:  linebot.FlexComponentAlignTypeStart,
-		// 		},
-		// 		// บรรทัดที่สอง: ข้อมูลเลขประจำตัวประชาชน
-		// 		&linebot.TextComponent{
-		// 			Type:   linebot.FlexComponentTypeText,
-		// 			Text:   "เลขประจำตัวประชาชน: " + patient.PatientInfo.CardID,
-		// 			Size:   linebot.FlexTextSizeTypeSm,
-		// 			Color:  "#F8F8F8",
-		// 			Margin: linebot.FlexComponentMarginTypeXs,
-		// 			Align:  linebot.FlexComponentAlignTypeStart,
-		// 		},
-		// 	},
-		// 	BackgroundColor: "#08BED7",
-		// },
 		Body: &linebot.BoxComponent{
 			Type:   linebot.FlexComponentTypeBox,
 			Layout: linebot.FlexBoxLayoutTypeVertical,
 			Contents: []linebot.FlexComponent{
 				&linebot.TextComponent{
 					Type:   linebot.FlexComponentTypeText,
-					Text:   patient.Name,
+					Text:   getSafeString(&patient.Name, "ไม่มีข้อมูล"),
 					Weight: linebot.FlexTextWeightTypeBold,
 					Size:   linebot.FlexTextSizeTypeLg,
 					Color:  "#000000",
 					Align:  linebot.FlexComponentAlignTypeStart,
 				},
-				// บรรทัดที่สอง: ข้อมูลเลขประจำตัวประชาชน
-				// &linebot.TextComponent{
-				// 	Type:   linebot.FlexComponentTypeText,
-				// 	Text:   "เลขประจำตัวประชาชน: " + patient.PatientInfo.CardID,
-				// 	Size:   linebot.FlexTextSizeTypeSm,
-				// 	Color:  "#555555",
-				// 	Margin: linebot.FlexComponentMarginTypeXs,
-				// 	Align:  linebot.FlexComponentAlignTypeStart,
-				// },
-				// ข้อมูลผู้ป่วย
-				createTextRow("อายุ", patient.Age+" ปี"),
-				createTextRow("เพศ", formatGender(patient.Sex)),
-				createTextRow("หมู่เลือด", patient.Blood),
-				createTextRow("ADL", patient.ADL),
-				createTextRow("เบอร์", patient.PhoneNumber),
+				createTextRow("อายุ", getSafeString(&patient.Age, "ไม่ระบุ")),
+				createTextRow("เพศ", formatGender(getSafeString(&patient.Sex, "ไม่ระบุ"))),
+				createTextRow("หมู่เลือด", getSafeString(&patient.Blood, "ไม่ระบุ")),
+				createTextRow("ADL", getSafeString(&patient.ADL, "ไม่มีข้อมูล")),
+				createTextRow("เบอร์", getSafeString(&patient.PhoneNumber, "ไม่มีข้อมูล")),
 				&linebot.SeparatorComponent{
 					Type:   linebot.FlexComponentTypeSeparator,
 					Color:  "#58BDCF",
 					Margin: linebot.FlexComponentMarginTypeXl,
 				},
-
-				// ข้อมูลสิทธิการรักษา
-				&linebot.BoxComponent{
-					Type:   linebot.FlexComponentTypeBox,
-					Layout: linebot.FlexBoxLayoutTypeVertical,
-					Contents: []linebot.FlexComponent{
-						&linebot.TextComponent{
-							Type:   linebot.FlexComponentTypeText,
-							Text:   "สิทธิการรักษา:",
-							Weight: linebot.FlexTextWeightTypeBold,
-							Size:   linebot.FlexTextSizeTypeMd,
-							Color:  "#000000",
-							Margin: linebot.FlexComponentMarginTypeMd,
-						},
-						&linebot.TextComponent{
-							Type:   linebot.FlexComponentTypeText,
-							Text:   patient.RightToTreatmentInfo.Right_to_treatment,
-							Size:   linebot.FlexTextSizeTypeMd,
-							Color:  "#212121",
-							Align:  linebot.FlexComponentAlignTypeStart,
-							Wrap:   true, // เปิดตัดข้อความอัตโนมัติ
-							Margin: linebot.FlexComponentMarginTypeSm,
-						},
-						&linebot.SpacerComponent{},
-					},
-				},
+				createTextRow("สิทธิการรักษา", rightToTreatment),
 			},
-			BackgroundColor: "#f3fcfd", // สีพื้นหลังสำหรับ Body
-
+			BackgroundColor: "#f3fcfd",
 		},
 	}
+
+	log.Printf("Flex Message Data: %+v", patient)
 
 	// สร้าง FlexMessage
 	return linebot.NewFlexMessage("ข้อมูลผู้สูงอายุ", container)
 }
+
+// ฟังก์ชันป้องกัน nil
+func getSafeString(value *string, defaultValue string) string {
+	if value != nil && *value != "" {
+		return *value
+	}
+	return defaultValue
+}
+
+// func FormatPatientInfo(patient *models.PatientInfo) *linebot.FlexMessage {
+// 	// สร้าง BubbleContainer
+// 	container := &linebot.BubbleContainer{
+// 		// 	Type: linebot.FlexContainerTypeBubble,
+// 		// 	Size: linebot.FlexBubbleSizeTypeMega,
+// 		// 	Hero: &linebot.ImageComponent{
+// 		// 		Type:        linebot.FlexComponentTypeImage,
+// 		// 		// URL:         imageUrl, // ใช้ URL ของภาพที่ได้รับจาก MinIO
+// 		// 		Size:        linebot.FlexImageSizeTypeFull,
+// 		// 		AspectRatio: "20:13",
+// 		// 		AspectMode:  "cover",
+// 		// 	},
+// 		// Header: &linebot.BoxComponent{
+// 		// 	Type:   linebot.FlexComponentTypeBox,
+// 		// 	Layout: linebot.FlexBoxLayoutTypeVertical,
+// 		// 	Contents: []linebot.FlexComponent{
+// 		// 		&linebot.TextComponent{
+// 		// 			Type:   linebot.FlexComponentTypeText,
+// 		// 			Text:   patient.PatientInfo.Name,
+// 		// 			Weight: linebot.FlexTextWeightTypeBold,
+// 		// 			Size:   linebot.FlexTextSizeTypeLg,
+// 		// 			Color:  "#FFFFFF",
+// 		// 			Align:  linebot.FlexComponentAlignTypeStart,
+// 		// 		},
+// 		// 		// บรรทัดที่สอง: ข้อมูลเลขประจำตัวประชาชน
+// 		// 		&linebot.TextComponent{
+// 		// 			Type:   linebot.FlexComponentTypeText,
+// 		// 			Text:   "เลขประจำตัวประชาชน: " + patient.PatientInfo.CardID,
+// 		// 			Size:   linebot.FlexTextSizeTypeSm,
+// 		// 			Color:  "#F8F8F8",
+// 		// 			Margin: linebot.FlexComponentMarginTypeXs,
+// 		// 			Align:  linebot.FlexComponentAlignTypeStart,
+// 		// 		},
+// 		// 	},
+// 		// 	BackgroundColor: "#08BED7",
+// 		// },
+// 		Body: &linebot.BoxComponent{
+// 			Type:   linebot.FlexComponentTypeBox,
+// 			Layout: linebot.FlexBoxLayoutTypeVertical,
+// 			Contents: []linebot.FlexComponent{
+// 				&linebot.TextComponent{
+// 					Type:   linebot.FlexComponentTypeText,
+// 					Text:   patient.Name,
+// 					Weight: linebot.FlexTextWeightTypeBold,
+// 					Size:   linebot.FlexTextSizeTypeLg,
+// 					Color:  "#000000",
+// 					Align:  linebot.FlexComponentAlignTypeStart,
+// 				},
+// 				// บรรทัดที่สอง: ข้อมูลเลขประจำตัวประชาชน
+// 				// &linebot.TextComponent{
+// 				// 	Type:   linebot.FlexComponentTypeText,
+// 				// 	Text:   "เลขประจำตัวประชาชน: " + patient.PatientInfo.CardID,
+// 				// 	Size:   linebot.FlexTextSizeTypeSm,
+// 				// 	Color:  "#555555",
+// 				// 	Margin: linebot.FlexComponentMarginTypeXs,
+// 				// 	Align:  linebot.FlexComponentAlignTypeStart,
+// 				// },
+// 				// ข้อมูลผู้ป่วย
+// 				createTextRow("อายุ", patient.Age+" ปี"),
+// 				createTextRow("เพศ", formatGender(patient.Sex)),
+// 				createTextRow("หมู่เลือด", patient.Blood),
+// 				createTextRow("ADL", patient.ADL),
+// 				createTextRow("เบอร์", patient.PhoneNumber),
+// 				&linebot.SeparatorComponent{
+// 					Type:   linebot.FlexComponentTypeSeparator,
+// 					Color:  "#58BDCF",
+// 					Margin: linebot.FlexComponentMarginTypeXl,
+// 				},
+
+// 				// ข้อมูลสิทธิการรักษา
+// 				&linebot.BoxComponent{
+// 					Type:   linebot.FlexComponentTypeBox,
+// 					Layout: linebot.FlexBoxLayoutTypeVertical,
+// 					Contents: []linebot.FlexComponent{
+// 						&linebot.TextComponent{
+// 							Type:   linebot.FlexComponentTypeText,
+// 							Text:   "สิทธิการรักษา:",
+// 							Weight: linebot.FlexTextWeightTypeBold,
+// 							Size:   linebot.FlexTextSizeTypeMd,
+// 							Color:  "#000000",
+// 							Margin: linebot.FlexComponentMarginTypeMd,
+// 						},
+// 						&linebot.TextComponent{
+// 							Type:   linebot.FlexComponentTypeText,
+// 							Text:   patient.RightToTreatmentInfo.Right_to_treatment,
+// 							Size:   linebot.FlexTextSizeTypeMd,
+// 							Color:  "#212121",
+// 							Align:  linebot.FlexComponentAlignTypeStart,
+// 							Wrap:   true, // เปิดตัดข้อความอัตโนมัติ
+// 							Margin: linebot.FlexComponentMarginTypeSm,
+// 						},
+// 						&linebot.SpacerComponent{},
+// 					},
+// 				},
+// 			},
+// 			BackgroundColor: "#f3fcfd", // สีพื้นหลังสำหรับ Body
+
+// 		},
+// 	}
+
+// 	// สร้าง FlexMessage
+// 	return linebot.NewFlexMessage("ข้อมูลผู้สูงอายุ", container)
+// }
 
 // &linebot.TextComponent{
 // 	Type:   linebot.FlexComponentTypeText,
@@ -629,8 +699,8 @@ func FormatActivityCategories() *linebot.FlexMessage {
 						&linebot.ButtonComponent{
 							Type: linebot.FlexComponentTypeButton,
 							Action: &linebot.MessageAction{
-								Label: "มิติสภาพแวดล้อม",
-								Text:  "มิติสภาพแวดล้อม",
+								Label: "มิติสิ่งแวดล้อม",
+								Text:  "มิติสิ่งแวดล้อม",
 							},
 							Style: linebot.FlexButtonStyleTypePrimary,
 							Color: "#00bcd4",
@@ -653,17 +723,31 @@ func FormatActivityCategories() *linebot.FlexMessage {
 	// ส่งกลับ Flex Message
 	return linebot.NewFlexMessage("เลือกมิติกิจกรรม", container)
 }
-//แสดงรายการกิจกรรม
+
+// แสดงรายการกิจกรรม
 func FormatActivities(activities []string) *linebot.FlexMessage {
 	var activityButtons []linebot.FlexComponent
 
-	// ✅ จำกัด Label ของปุ่มไม่เกิน 40 ตัวอักษร
+	// ✅ ฟังก์ชันตัดข้อความให้ยาวไม่เกิน 40 ตัวอักษร
 	truncateLabel := func(text string) string {
 		if len(text) > 40 {
 			return text[:37] + "..." // ตัดให้เหลือ 37 ตัว แล้วเติม "..."
 		}
 		return text
 	}
+
+	// ✅ สร้างปุ่ม "🔙 ย้อนกลับ" เป็นปุ่มแรก
+	backButton := &linebot.ButtonComponent{
+		Type:   linebot.FlexComponentTypeButton,
+		Style:  linebot.FlexButtonStyleTypeSecondary,
+		Height: linebot.FlexButtonHeightTypeMd,
+		Color:  "#FF9800", // 🔸 ปรับสีให้ดูเด่นขึ้น
+		Action: &linebot.MessageAction{
+			Label: "🔙 ย้อนกลับ",
+			Text:  "ย้อนกลับ",
+		},
+	}
+	activityButtons = append(activityButtons, backButton) // ใส่ปุ่มย้อนกลับก่อนกิจกรรม
 
 	// ✅ สร้างปุ่มกิจกรรมจากรายการที่รับมา
 	for _, activity := range activities {
@@ -705,24 +789,23 @@ func FormatActivities(activities []string) *linebot.FlexMessage {
 			BackgroundColor: "#00bcd4",
 		},
 		Body: &linebot.BoxComponent{
-			Type:   linebot.FlexComponentTypeBox,
-			Layout: linebot.FlexBoxLayoutTypeVertical,
+			Type:    linebot.FlexComponentTypeBox,
+			Layout:  linebot.FlexBoxLayoutTypeVertical,
 			Spacing: linebot.FlexComponentSpacingTypeMd,
 			Contents: append([]linebot.FlexComponent{
 				&linebot.TextComponent{
-					Type:   linebot.FlexComponentTypeText,
-					Text:   "กรุณาเลือกกิจกรรมที่ต้องการบันทึก:",
-					Size:   linebot.FlexTextSizeTypeMd,
-					Align:  linebot.FlexComponentAlignTypeStart,
-					Wrap:   true,
+					Type:  linebot.FlexComponentTypeText,
+					Text:  "กรุณาเลือกกิจกรรมที่ต้องการบันทึก:",
+					Size:  linebot.FlexTextSizeTypeMd,
+					Align: linebot.FlexComponentAlignTypeStart,
+					Wrap:  true,
 				},
-			}, activityButtons...),
+			}, activityButtons...), // ✅ ใส่ปุ่มกิจกรรม + ปุ่มย้อนกลับ
 		},
 	}
 
 	return linebot.NewFlexMessage("เลือกกิจกรรม", container)
 }
-
 
 
 // ฟังก์ชันสร้างแถวข้อความ
@@ -1025,7 +1108,7 @@ func FormatactivityRecordStarttime(activityRecord *models.Activityrecord) *lineb
 			Contents: []linebot.FlexComponent{
 				&linebot.TextComponent{
 					Type:   linebot.FlexComponentTypeText,
-					Text:   "กิจกรรม: "+ activityRecord.ActivityOther,
+					Text:   "กิจกรรม: " + activityRecord.ActivityOther,
 					Weight: linebot.FlexTextWeightTypeBold,
 					Size:   linebot.FlexTextSizeTypeMd,
 					Align:  linebot.FlexComponentAlignTypeCenter,
@@ -1038,7 +1121,7 @@ func FormatactivityRecordStarttime(activityRecord *models.Activityrecord) *lineb
 				},
 				&linebot.TextComponent{
 					Type:   linebot.FlexComponentTypeText,
-					Text:   "เวลาเริ่มต้น: "+ getCurrentTime(),
+					Text:   "เวลาเริ่มต้น: " + getCurrentTime(),
 					Weight: linebot.FlexTextWeightTypeRegular,
 					Size:   linebot.FlexTextSizeTypeMd,
 					Color:  "#212121",
@@ -1046,11 +1129,11 @@ func FormatactivityRecordStarttime(activityRecord *models.Activityrecord) *lineb
 					Margin: linebot.FlexComponentMarginTypeMd,
 				},
 				&linebot.TextComponent{
-					Type:   linebot.FlexComponentTypeText,
-					Text:   "กรุณากดปุ่ม \"เสร็จสิ้น\" เมื่อทำกิจกรรมเสร็จ",
-					Size:   linebot.FlexTextSizeTypeSm,
-					Align:  linebot.FlexComponentAlignTypeCenter,
-					Wrap:   true,
+					Type:  linebot.FlexComponentTypeText,
+					Text:  "กรุณากดปุ่ม \"เสร็จสิ้น\" เมื่อทำกิจกรรมเสร็จ",
+					Size:  linebot.FlexTextSizeTypeSm,
+					Align: linebot.FlexComponentAlignTypeCenter,
+					Wrap:  true,
 				},
 			},
 		},

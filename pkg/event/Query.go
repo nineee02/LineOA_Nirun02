@@ -54,53 +54,35 @@ func IsEmployeeCheckedIn(db *sql.DB, userInfoID int) (bool, error) {
 
 // บันทึกการเช็คอิน
 func RecordCheckIn(db *sql.DB, userID int) error {
-	// ดึง employee_info_id ที่สัมพันธ์กับ user_info_id
-	var employeeID sql.NullInt64 // ใช้ sql.NullInt64 เพื่อจัดการค่า NULL
-	query := `SELECT employee_info_id FROM user_info WHERE user_info_id = ?`
-	err := db.QueryRow(query, userID).Scan(&employeeID)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			return fmt.Errorf("ไม่พบ employee_info_id สำหรับ user_info_id: %d", userID)
-		}
-		return fmt.Errorf("error fetching employee_info_id: %v", err)
+	// ตรวจสอบว่าผู้ใช้เช็คอินอยู่หรือไม่
+	var existingCheckIn sql.NullTime
+	queryCheck := `SELECT check_in FROM worktime_record WHERE user_info_id = ? AND check_out IS NULL`
+	err := db.QueryRow(queryCheck, userID).Scan(&existingCheckIn)
+	if err != nil && err != sql.ErrNoRows {
+		return fmt.Errorf("error checking existing check-in: %v", err)
 	}
 
-	// เตรียม Query สำหรับ INSERT
-	var insertQuery string
-	var args []interface{}
-
-	if employeeID.Valid { // ตรวจสอบว่ามีค่า employee_info_id หรือไม่
-		insertQuery = `
-			INSERT INTO worktime_record (
-				check_in,
-				create_by,
-				update_by,
-				user_info_id,
-				employee_info_id,
-				create_date,
-				update_date
-			)
-			VALUES (NOW(), ?, ?, ?, ?, NOW(), NOW())`
-		args = []interface{}{userID, userID, userID, employeeID.Int64}
-	} else {
-		insertQuery = `
-			INSERT INTO worktime_record (
-				check_in,
-				create_by,
-				update_by,
-				user_info_id,
-				create_date,
-				update_date
-			)
-			VALUES (NOW(), ?, ?, ?, NOW(), NOW())`
-		args = []interface{}{userID, userID, userID}
+	// ถ้าพบว่ามีการเช็คอินอยู่แล้ว
+	if existingCheckIn.Valid {
+		return fmt.Errorf("ผู้ใช้ได้ทำการเช็คอินไปแล้ว")
 	}
 
-	// บันทึกข้อมูลการเช็คอิน
-	_, err = db.Exec(insertQuery, args...)
+	// ดำเนินการเช็คอิน
+	queryInsert := `
+		INSERT INTO worktime_record (
+			check_in,
+			create_by,
+			update_by,
+			user_info_id,
+			create_date,
+			update_date
+		)
+		VALUES (NOW(), ?, ?, ?, NOW(), NOW())`
+	_, err = db.Exec(queryInsert, userID, userID, userID)
 	if err != nil {
 		return fmt.Errorf("error recording check-in: %v", err)
 	}
+
 	return nil
 }
 
@@ -108,8 +90,8 @@ func RecordCheckIn(db *sql.DB, userID int) error {
 func RecordCheckOut(db *sql.DB, userID int) error {
 	query := `
 		UPDATE worktime_record
-		SET
-			check_out = NOW(),
+		SET check_out = NOW(),
+			period = TIMEDIFF(NOW(), check_in),
 			update_date = NOW(),
 			update_by = ?
 		WHERE user_info_id = ? AND check_out IS NULL`
@@ -118,6 +100,36 @@ func RecordCheckOut(db *sql.DB, userID int) error {
 		return fmt.Errorf("error recording check-out: %v", err)
 	}
 	return nil
+}
+
+// AutoCheckOut - อัปเดต Check-out เป็นเที่ยงคืนอัตโนมัติ
+func AutoCheckOut(db *sql.DB) error {
+	query := `
+		UPDATE worktime_record
+		SET check_out = NOW(),
+			update_date = NOW()
+		WHERE check_out IS NULL`
+	_, err := db.Exec(query)
+	if err != nil {
+		return fmt.Errorf("error performing auto check-out: %v", err)
+	}
+	log.Println("Auto check-out completed successfully.")
+	return nil
+}
+
+// รันเซิร์ฟใหม่ทุกๆเที่ยงคืน
+func StartAutoCheckOutScheduler(db *sql.DB) {
+	ticker := time.NewTicker(24 * time.Hour) // รันทุก 24 ชั่วโมง
+	go func() {
+		for {
+			<-ticker.C
+			log.Println("Running auto check-out at midnight...")
+			err := AutoCheckOut(db)
+			if err != nil {
+				log.Println("Auto check-out error:", err)
+			}
+		}
+	}()
 }
 
 // ดึงข้อมูลบันทึกเวลาทำงานสำหรับผู้ใช้ตาม ID
@@ -276,6 +288,7 @@ func GetTechnologyActivities(db *sql.DB) ([]models.ActivityTechnologyInfo, error
 
 	return activities, nil
 }
+
 // กิจกรรมมิติสังคม
 func GetSocialActivities(db *sql.DB) ([]models.ActivitySocialInfo, error) {
 	query := `SELECT activity_social_info_id, activity, service_type, create_date FROM activity_social_info`
@@ -296,6 +309,7 @@ func GetSocialActivities(db *sql.DB) ([]models.ActivitySocialInfo, error) {
 
 	return activities, nil
 }
+
 // กิจกรรมมิติสุขภาพ
 func GetHealthActivities(db *sql.DB) ([]models.ActivityHealthInfo, error) {
 	query := `SELECT activity_health_info_id, activity, service_type, create_date FROM activity_health_info`
@@ -316,6 +330,7 @@ func GetHealthActivities(db *sql.DB) ([]models.ActivityHealthInfo, error) {
 
 	return activities, nil
 }
+
 // กิจกรรมมิติเศรษฐกิจ
 func GetEconomicActivities(db *sql.DB) ([]models.ActivityEconomicInfo, error) {
 	query := `SELECT activity_economic_info_id, activity, service_type, create_date FROM activity_economic_info`
@@ -336,6 +351,7 @@ func GetEconomicActivities(db *sql.DB) ([]models.ActivityEconomicInfo, error) {
 
 	return activities, nil
 }
+
 // กิจกรรมมิติสภาพแวดล้อม
 func GetEnvironmentalActivities(db *sql.DB) ([]models.ActivityEnvironmentalInfo, error) {
 	query := `SELECT activity_environmental_info_id, activity, service_type, create_date FROM activity_environmental_info`
@@ -384,9 +400,9 @@ func GetActivityInfoIDByType(db *sql.DB, category string, activityName string) (
 	return activityInfoID, nil
 }
 
-//[บันทึกกกิจกรรม]
+// [บันทึกกกิจกรรม]
 func SaveActivityRecord(db *sql.DB, activity *models.Activityrecord, category string) error {
-	// ✅ ดึง patient_info_id
+	//ดึง patient_info_id
 	patient, err := GetPatientInfoByName(db, activity.PatientInfo.CardID)
 	if err != nil {
 		log.Printf("Error fetching patient_info_id: %v", err)
@@ -394,13 +410,13 @@ func SaveActivityRecord(db *sql.DB, activity *models.Activityrecord, category st
 	}
 	activity.PatientInfo.PatientInfo_ID = patient.PatientInfo.PatientInfo_ID
 
-	// ✅ ตรวจสอบ patient_info_id
+	//ตรวจสอบ patient_info_id
 	if activity.PatientInfo.PatientInfo_ID == 0 {
 		log.Println("Invalid patient_info_id")
 		return fmt.Errorf("patient_info_id is missing or invalid")
 	}
 
-	// ✅ ตรวจสอบ activity_info_id และเลือกคอลัมน์ที่ถูกต้อง
+	//ตรวจสอบ activity_info_id และเลือกคอลัมน์ที่ถูกต้อง
 	var activityInfoColumn string
 	activityInfoID := activity.ActivityRecord_ID
 
@@ -425,7 +441,7 @@ func SaveActivityRecord(db *sql.DB, activity *models.Activityrecord, category st
 		return fmt.Errorf("no activity selected")
 	}
 
-	// ✅ ใช้ Dynamic SQL Query เพื่อเลือกคอลัมน์ที่ถูกต้อง
+	//ใช้ Dynamic SQL Query เพื่อเลือกคอลัมน์ที่ถูกต้อง
 	query := fmt.Sprintf(`
 		INSERT INTO activity_record (
 			patient_info_id,
@@ -438,17 +454,17 @@ func SaveActivityRecord(db *sql.DB, activity *models.Activityrecord, category st
 
 	result, err := db.Exec(query,
 		activity.PatientInfo.PatientInfo_ID,
-		activityInfoID,       
-		time.Now(),           
-		activity.UserInfo.UserInfo_ID, 
-		activity.UserInfo.UserInfo_ID, 
+		activityInfoID,
+		time.Now(),
+		activity.UserInfo.UserInfo_ID,
+		activity.UserInfo.UserInfo_ID,
 	)
 	if err != nil {
 		log.Printf("Error inserting activity record: %v", err)
 		return fmt.Errorf("error inserting activity record: %v", err)
 	}
 
-	// ✅ ดึง activity_record_id
+	//ดึง activity_record_id
 	activityRecordID, err := result.LastInsertId()
 	if err != nil {
 		log.Printf("Error retrieving last insert id: %v", err)
@@ -459,9 +475,6 @@ func SaveActivityRecord(db *sql.DB, activity *models.Activityrecord, category st
 	log.Printf("ActivityRecord_ID: %d saved successfully", activity.ActivityRecord_ID)
 	return nil
 }
-
-
-
 
 // บันทึกกิจกรรม
 // func SaveActivityRecord(db *sql.DB, activity *models.Activityrecord) error {
@@ -572,73 +585,166 @@ func GetActivityStartTime(db *sql.DB, cardID string, activity string) (time.Time
 	return startTime, nil
 }
 
+// ดึง start_time ของกิจกรรมล่าสุดจากฐานข้อมูล
+func SaveActivityCompletion(db *sql.DB, cardID string, activity string, startTime, endTime time.Time, period string, userID string) error {
+	query := `
+		UPDATE activity_record
+		SET end_time = ?, period = ?, update_by = ?
+		WHERE patient_info_id = (SELECT patient_info_id FROM patient_info WHERE card_id = ?)
+		AND activity_record_id = (SELECT activity_record_id FROM service_info WHERE activity = ?)
+		AND start_time = ? 
+		LIMIT 1
+	`
+	_, err := db.Exec(query, endTime, period, userID, cardID, activity, startTime)
+	if err != nil {
+		log.Printf("Error updating activity completion data: %v", err)
+		return fmt.Errorf("error updating activity completion: %v", err)
+	}
+
+	log.Printf("Activity completion recorded successfully for cardID: %s", cardID)
+	return nil
+}
+
+
+// อัปเดต end_time และ period ในฐานข้อมูล
+func updateActivityEndTime(db *sql.DB, userID string, startTime, endTime time.Time, duration string) error {
+	query := `UPDATE activity_record SET end_time = ?, period = ? WHERE user_info_id = ? AND start_time = ?`
+	_, err := db.Exec(query, endTime, duration, userID, startTime)
+	if err != nil {
+		return fmt.Errorf("เกิดข้อผิดพลาดในการบันทึก end_time: %v", err)
+	}
+	return nil
+}
+
 // อัปเดตเวลาสิ้นสุดของกิจกรรม
-func UpdateActivityEndTime(db *sql.DB, activity *models.Activityrecord) error {
-	// ตรวจสอบข้อมูลพื้นฐาน
+func UpdateActivityRecordWithoutEndTime(db *sql.DB, activity *models.Activityrecord) error {
+	// ตรวจสอบค่าข้อมูลพื้นฐานก่อนอัปเดต
 	if activity.PatientInfo.PatientInfo_ID == 0 {
-		return fmt.Errorf("patient_info_id is invalid")
+		return fmt.Errorf("❌ patient_info_id is invalid")
 	}
-
 	if activity.ActivityRecord_ID == 0 {
-		log.Println("Invalid ActivityRecord_ID")
-		return fmt.Errorf("activity record ID is invalid")
+		log.Println("❌ Invalid ActivityRecord_ID")
+		return fmt.Errorf("❌ activity record ID is invalid")
 	}
 
-	// ตรวจสอบว่า activity_record_id ตรงกับ patient_info_id หรือไม่
+	// ตรวจสอบว่า activity_record_id ตรงกับ patient_info_id หรือไม่ และยังไม่มี end_time
 	checkQuery := `
 		SELECT COUNT(*)
 		FROM activity_record
-		WHERE activity_record_id = ? AND patient_info_id = ? AND end_time IS NULL
+		WHERE activity_record_id = ? AND patient_info_id = ? 
 	`
 	var count int
 	err := db.QueryRow(checkQuery, activity.ActivityRecord_ID, activity.PatientInfo.PatientInfo_ID).Scan(&count)
 	if err != nil {
-		log.Printf("SQL Execution error (checking record match): %v", err)
-		return fmt.Errorf("error verifying activity record: %v", err)
+		log.Printf("⚠️ SQL Execution error (checking record match): %v", err)
+		return fmt.Errorf("⚠️ error verifying activity record: %v", err)
 	}
 	if count == 0 {
-		return fmt.Errorf("activity_record_id does not match with patient_info_id or record already has end_time")
+		return fmt.Errorf("⚠️ activity_record_id does not match with patient_info_id")
 	}
 
-	// อัปเดตข้อมูลเมื่อการตรวจสอบผ่าน
+	// อัปเดตข้อมูล **โดยไม่แตะต้อง `end_time`**
 	updateQuery := `
 	        UPDATE activity_record 
 	        SET 
-	            end_time = ?, 
 	            employee_info_id = ?, 
 	            write_by = ?, 
 	            write_date = NOW()
-	        WHERE activity_record_id = ? AND end_time IS NULL
+	        WHERE activity_record_id = ? 
 			LIMIT 1;`
 
-	log.Printf("Updating activity_record with: EndTime: %v, EmployeeInfo_ID: %d, WriteBy: %d, ActivityRecord_ID: %d",
-		activity.EndTime,
+	log.Printf("🔄 Updating activity_record (without end_time) with:\n➡️ EmployeeInfo_ID: %d\n➡️ WriteBy: %d\n➡️ ActivityRecord_ID: %d",
 		activity.EmployeeInfo.EmployeeInfo_ID,
 		activity.UserInfo.UserInfo_ID,
 		activity.ActivityRecord_ID,
 	)
 
 	result, err := db.Exec(updateQuery,
-		activity.EndTime,
 		activity.EmployeeInfo.EmployeeInfo_ID,
 		activity.UserInfo.UserInfo_ID,
 		activity.ActivityRecord_ID,
 	)
 
 	if err != nil {
-		log.Printf("SQL Execution error: %v", err)
-		return fmt.Errorf("error updating end time: %v", err)
+		log.Printf("❌ SQL Execution error: %v", err)
+		return fmt.Errorf("❌ error updating activity record: %v", err)
 	}
 
 	rowsAffected, _ := result.RowsAffected()
-	log.Printf("Rows affected: %d", rowsAffected)
+	log.Printf("✅ Rows affected: %d", rowsAffected)
 
 	if rowsAffected == 0 {
-		return fmt.Errorf("no rows were updated - check your WHERE conditions")
+		return fmt.Errorf("⚠️ no rows were updated - check your WHERE conditions")
 	}
 
 	return nil
 }
+// func UpdateActivityEndTime(db *sql.DB, activity *models.Activityrecord) error {
+// 	// ตรวจสอบข้อมูลพื้นฐาน
+// 	if activity.PatientInfo.PatientInfo_ID == 0 {
+// 		return fmt.Errorf("patient_info_id is invalid")
+// 	}
+
+// 	if activity.ActivityRecord_ID == 0 {
+// 		log.Println("Invalid ActivityRecord_ID")
+// 		return fmt.Errorf("activity record ID is invalid")
+// 	}
+
+// 	// ตรวจสอบว่า activity_record_id ตรงกับ patient_info_id หรือไม่
+// 	checkQuery := `
+// 		SELECT COUNT(*)
+// 		FROM activity_record
+// 		WHERE activity_record_id = ? AND patient_info_id = ? AND end_time IS NULL
+// 	`
+// 	var count int
+// 	err := db.QueryRow(checkQuery, activity.ActivityRecord_ID, activity.PatientInfo.PatientInfo_ID).Scan(&count)
+// 	if err != nil {
+// 		log.Printf("SQL Execution error (checking record match): %v", err)
+// 		return fmt.Errorf("error verifying activity record: %v", err)
+// 	}
+// 	if count == 0 {
+// 		return fmt.Errorf("activity_record_id does not match with patient_info_id or record already has end_time")
+// 	}
+
+// 	// อัปเดตข้อมูลเมื่อการตรวจสอบผ่าน
+// 	updateQuery := `
+// 	        UPDATE activity_record 
+// 	        SET 
+// 	            end_time = ?, 
+// 	            employee_info_id = ?, 
+// 	            write_by = ?, 
+// 	            write_date = NOW()
+// 	        WHERE activity_record_id = ? AND end_time IS NULL
+// 			LIMIT 1;`
+
+// 	log.Printf("Updating activity_record with: EndTime: %v, EmployeeInfo_ID: %d, WriteBy: %d, ActivityRecord_ID: %d",
+// 		activity.EndTime,
+// 		activity.EmployeeInfo.EmployeeInfo_ID,
+// 		activity.UserInfo.UserInfo_ID,
+// 		activity.ActivityRecord_ID,
+// 	)
+
+// 	result, err := db.Exec(updateQuery,
+// 		activity.EndTime,
+// 		activity.EmployeeInfo.EmployeeInfo_ID,
+// 		activity.UserInfo.UserInfo_ID,
+// 		activity.ActivityRecord_ID,
+// 	)
+
+// 	if err != nil {
+// 		log.Printf("SQL Execution error: %v", err)
+// 		return fmt.Errorf("error updating end time: %v", err)
+// 	}
+
+// 	rowsAffected, _ := result.RowsAffected()
+// 	log.Printf("Rows affected: %d", rowsAffected)
+
+// 	if rowsAffected == 0 {
+// 		return fmt.Errorf("no rows were updated - check your WHERE conditions")
+// 	}
+
+// 	return nil
+// }
 
 // บันทึกกิจกรรม
 // func SaveActivity(db *sql.DB, activity string) error {
@@ -668,8 +774,36 @@ func UploadFileToMinIO(client *minio.Client, bucketName, objectName, filePath st
 	return fileURL, nil
 }
 
+// func DownloadFileFromMinIO(minioClient *minio.Client, bucketName, objectName, filePath string) error {
+// 	//ตั้งค่า Context
+// 	ctx := context.Background()
+
+// 	//ดึงไฟล์จาก MinIO (แบบ Stream)
+// 	object, err := minioClient.GetObject(ctx, bucketName, objectName, minio.GetObjectOptions{})
+// 	if err != nil {
+// 		return fmt.Errorf("❌ Error getting object from MinIO: %v", err)
+// 	}
+// 	defer object.Close()
+
+// 	//สร้างไฟล์ใหม่เพื่อบันทึกข้อมูล
+// 	file, err := os.Create(filePath)
+// 	if err != nil {
+// 		return fmt.Errorf("❌ Error creating file: %v", err)
+// 	}
+// 	defer file.Close()
+
+// 	//คัดลอกข้อมูลจาก Stream ไปยังไฟล์
+// 	_, err = io.Copy(file, object)
+// 	if err != nil {
+// 		return fmt.Errorf("❌ Error writing file: %v", err)
+// 	}
+
+// 	log.Printf("✅ Successfully downloaded file from MinIO: %s", filePath)
+// 	return nil
+// }
+
 // อัปเดต URL ของรูปการทำกิจกรรมในฐานข้อมูล
-func updateEvidenceImageActivity(db *sql.DB, patientInfoID int, fileURL string) error {
+func updateEvidenceImageActivity(db *sql.DB, patientInfoID int, fileURL string, timestamp time.Time) error {
 	query := `
 		UPDATE activity_record
 		SET evidence_activity = ?
@@ -688,13 +822,25 @@ func updateEvidenceImageActivity(db *sql.DB, patientInfoID int, fileURL string) 
 func GetActivityNameByPatientInfoID(db *sql.DB, patientInfoID int) (string, error) {
 	var activity string
 	query := `
-		SELECT si.activity
-		FROM service_info si
-		JOIN activity_record ar ON si.service_info_id = ar.service_info_id
-		WHERE ar.patient_info_id = ?
-		ORDER BY ar.create_date DESC
-		LIMIT 1
-	`
+    SELECT 
+        COALESCE(
+            at.activity_technology_info_id, 
+            aso.activity_social_info_id, 
+            ah.activity_health_info_id, 
+            aec.activity_economic_info_id, 
+            aenv.activity_environmental_info_id, 
+            ar.activity_other
+        ) AS activity
+    FROM activity_record ar
+    LEFT JOIN activity_technology_info at ON at.activity_technology_info_id = ar.activity_technology_info_id
+    LEFT JOIN activity_social_info aso ON aso.activity_social_info_id = ar.activity_social_info_id
+    LEFT JOIN activity_health_info ah ON ah.activity_health_info_id = ar.activity_health_info_id
+    LEFT JOIN activity_economic_info aec ON aec.activity_economic_info_id = ar.activity_economic_info_id
+    LEFT JOIN activity_environmental_info aenv ON aenv.activity_environmental_info_id = ar.activity_environmental_info_id
+    WHERE ar.patient_info_id = ?
+    ORDER BY ar.create_date DESC
+    LIMIT 1
+`
 	err := db.QueryRow(query, patientInfoID).Scan(&activity)
 	if err != nil {
 		return "", fmt.Errorf("error fetching activity name: %v", err)
@@ -702,7 +848,7 @@ func GetActivityNameByPatientInfoID(db *sql.DB, patientInfoID int) (string, erro
 	return activity, nil
 }
 
-// -ข้อมูลpatient_info_idผ่านcard_id การเก็บรูปหลักฐาน
+// ข้อมูลpatient_info_idผ่านcard_id การเก็บรูปหลักฐาน
 func GetPatientInfoIDByCardID(db *sql.DB, cardID string) (int, error) {
 	var patientInfoID int
 	err := db.QueryRow("SELECT patient_info_id FROM patient_info WHERE card_id = ?", cardID).Scan(&patientInfoID)

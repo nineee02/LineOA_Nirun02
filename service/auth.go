@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"net/http"
 	"nirun/pkg/models"
@@ -26,7 +26,7 @@ type Params struct {
 }
 
 // PostRequestByID ฟังก์ชันสำหรับส่ง HTTP POST Request ตาม ID ที่กำหนด
-func PostRequestByID(cardID string) (*models.PatientInfo, error) {
+func PostRequestPatientByID(cardID string) (*models.PatientInfo, error) {
 	// ตั้งค่าพารามิเตอร์ JSON-RPC
 	params := Params{
 		Service: "object",
@@ -38,7 +38,7 @@ func PostRequestByID(cardID string) (*models.PatientInfo, error) {
 			"ni.patient",      // โมเดล
 			"search_read",     // เมธอด
 			[]interface{}{
-				[][]interface{}{{"identification_id", "=", cardID}},                                             // ใช้ค่า ID ที่รับเข้ามา
+				[][]interface{}{{"identification_id", "=", cardID}},  // ใช้ค่า ID ที่รับเข้ามา
 				[]string{"name", "title", "identification_id", "gender", "birthdate", "age", "phone", "mobile"}, // ฟิลด์ที่ต้องการ
 			},
 			map[string]interface{}{"limit": 80, "offset": 0, "order": "birthdate"},
@@ -78,7 +78,7 @@ func PostRequestByID(cardID string) (*models.PatientInfo, error) {
 	defer resp.Body.Close()
 
 	// อ่าน Response
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		log.Fatalf("Error reading response: %v", err)
 	}
@@ -94,9 +94,9 @@ func PostRequestByID(cardID string) (*models.PatientInfo, error) {
 	if res, ok := result["result"].([]interface{}); ok && len(res) > 0 {
 		patientData := res[0].(map[string]interface{})
 		patient := models.PatientInfo{
-			Name:        patientData["name"].(string),
+			Name: patientData["name"].(string),
 			// CardID:      patientData["identification_id"].(string),
-			Sex:         getGender(patientData, "gender"),
+			Sex: getGender(patientData, "gender"),
 			// DateOfBirth: patientData["birthdate"].(string),
 			Age:         fmt.Sprintf("%v ปี", patientData["age"]),
 			PhoneNumber: patientData["phone"].(string),
@@ -138,7 +138,6 @@ func getString(data map[string]interface{}, key string) string {
 }
 
 // getGender ดึงค่า gender รองรับทั้ง bool และ string
-// getGender ดึงค่า gender รองรับทั้ง bool และ string
 func getGender(data map[string]interface{}, key string) string {
 	if val, ok := data[key]; ok {
 		switch v := val.(type) {
@@ -153,3 +152,89 @@ func getGender(data map[string]interface{}, key string) string {
 	}
 	return "ไม่ระบุ" // คืนค่าเริ่มต้นหากไม่มีข้อมูล
 }
+
+// PostRequestService ฟังก์ชันส่ง JSON-RPC Request
+func PostActivitiesByCategory(categoryID int) ([]string, error) {
+    //ตั้งค่าพารามิเตอร์ JSON-RPC
+    params := Params{
+        Service: "object",
+        Method:  "execute_kw",
+        Args: []interface{}{
+            "nirun-community",
+            12,               
+            "0809697302",     
+            "ni.service",    
+            "search_read",   
+            []interface{}{
+                [][]interface{}{
+                    {"category_id", "=", categoryID},
+                },
+            },
+            map[string]interface{}{"fields": []string{"name"}}, //map
+        },
+    }
+
+    //สร้างโครงสร้าง JSON-RPC Request
+    requestBody := RequestBody{
+        JSONRPC: "2.0",
+        Method:  "call",
+        Params:  params,
+        ID:      12345,
+    }
+
+    //แปลงเป็น JSON
+    jsonData, err := json.Marshal(requestBody)
+    if err != nil {
+        return nil, fmt.Errorf("❌ Error encoding JSON: %v", err)
+    }
+
+    //ส่ง HTTP POST Request
+    url := "https://community.app.nirun.life/jsonrpc"
+    req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
+    if err != nil {
+        return nil, fmt.Errorf("Error creating request: %v", err)
+    }
+    req.Header.Set("Content-Type", "application/json")
+
+    //ส่ง Request
+    client := &http.Client{}
+    resp, err := client.Do(req)
+    if err != nil {
+        return nil, fmt.Errorf("Error making request: %v", err)
+    }
+    defer resp.Body.Close()
+
+    //อ่าน Response
+    body, err := io.ReadAll(resp.Body)
+    if err != nil {
+        return nil, fmt.Errorf("Error reading response: %v", err)
+    }
+
+    //พิมพ์ JSON Response เพื่อตรวจสอบข้อมูลที่ได้รับ
+    log.Printf("API Response for category_id %d: %s", categoryID, body)
+
+    //แปลง JSON Response เป็น `map`
+    var result map[string]interface{}
+    err = json.Unmarshal(body, &result)
+    if err != nil {
+        return nil, fmt.Errorf("Error decoding JSON response: %v", err)
+    }
+
+    //ตรวจสอบและดึงข้อมูล
+    var activities []string
+    if res, ok := result["result"].([]interface{}); ok && len(res) > 0 {
+        for _, item := range res {
+            data := item.(map[string]interface{})
+            if name, exists := data["name"].(string); exists {
+                activities = append(activities, name)
+            }
+        }
+    } else {
+        log.Printf("No activities found for category ID %d", categoryID)
+        return nil, fmt.Errorf("No activities found for category ID %d", categoryID)
+    }
+
+    return activities, nil
+}
+
+

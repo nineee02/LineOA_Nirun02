@@ -68,7 +68,7 @@ type Activityrecord struct {
 	ActivitySocialInfo        ActivitySocialInfo        `json:"activity_social_info"`
 	ActivityHealthInfo        ActivityHealthInfo        `json:"activity_health_info"`
 	ActivityEconomicInfo      ActivityEconomicInfo      `json:"activity_economic_info"`
-	ActivityEnvironmentalInfo ActivityEnvironmentalInfo `json:"activity_environmental"`
+	ActivityEnvironmentalInfo ActivityEnvironmentalInfo `json:"activity_environmental_info"`
 	ActivityOther             string                    `json:"activity_other"`
 }
 
