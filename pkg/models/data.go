@@ -55,8 +55,8 @@ type Activityrecord struct {
 	StartTime                 time.Time                 `json:"start_time"`
 	EndTime                   time.Time                 `json:"end_time"`
 	Period                    string                    `json:"period"`
-	Evidence_activity         []byte                    `json:"evidence_activity"`
-	Evidence_time             []byte                    `json:"evidence_time"`
+	Image_beforeActivity      []byte                    `json:"image_before"`
+	Image_afterActivity       []byte                    `json:"image_after"`
 	CreateDate                string                    `json:"create_date"`
 	UpdateDate                string                    `json:"update_date"`
 	UserInfo                  User_info                 `json:"user_info"`
