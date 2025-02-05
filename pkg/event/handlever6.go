@@ -160,7 +160,7 @@ func handleServiceRecordStste(bot *linebot.Client, event *linebot.Event, State s
 	}
 
 	// ขอให้ผู้ใช้กรอกเลขบัตรประชาชน
-	sendReply(bot, event.ReplyToken, "กรุณากรอกเลขบัตรประชาชน 13 หลักของผู้เข้ารับบริการ\nตัวอย่างเช่น 1234567891234 :")
+	// sendReply(bot, event.ReplyToken, "กรุณากรอกเลขบัตรประชาชน 13 หลักของผู้เข้ารับบริการ\nตัวอย่างเช่น 1234567891234 :")
 
 	// ตั้งค่าผู้ใช้ให้อยู่ในโหมดรอเลขบัตรประชาชน
 	setUserState(State, "wait status handleServiceGetCardID")
@@ -504,9 +504,6 @@ func handleServiceGetCardID(bot *linebot.Client, event *linebot.Event, State str
 		return
 	}
 
-	// ดึงข้อความที่ผู้ใช้ส่งมา
-	message := strings.TrimSpace(event.Message.(*linebot.TextMessage).Text)
-
 	db, err := database.ConnectToDB()
 	if err != nil {
 		log.Println("Database connection error:", err)
@@ -515,13 +512,38 @@ func handleServiceGetCardID(bot *linebot.Client, event *linebot.Event, State str
 	}
 	defer db.Close()
 
-	// ข้อความที่รับ = "บันทึกการบริการ"
+	userID := event.Source.UserID
+
+	// ตรวจสอบสถานะการเช็คอินของพนักงาน
+	userInfo, err := GetUserInfoByLINEID(db, userID)
+	if err != nil {
+		log.Println("ไม่พบข้อมูลพนักงานที่เชื่อมโยงกับ LINE ID นี้.")
+		sendReply(bot, event.ReplyToken, "คุณยังไม่ได้ลงทะเบียนในระบบ กรุณาติดต่อผู้ดูแล.")
+		return
+	}
+
+	isCheckedIn, err := IsEmployeeCheckedIn(db, userInfo.UserInfo_ID)
+	if err != nil {
+		log.Println("Error checking worktime status:", err)
+		sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการตรวจสอบสถานะการลงเวลาทำงาน กรุณาลองใหม่.")
+		return
+	}
+
+	if !isCheckedIn {
+		sendReply(bot, event.ReplyToken, "คุณยังไม่ได้ลงเวลาทำงาน กรุณาเช็คอินก่อนเริ่มบันทึกการบริการ.")
+		return
+	}
+
+	//ดึงข้อความที่ผู้ใช้ส่งมา
+	message := strings.TrimSpace(event.Message.(*linebot.TextMessage).Text)
+
+	// กรณีผู้ใช้ยังไม่ได้กรอกเลขบัตรประชาชน
 	if message == "บันทึกการบริการ" {
 		sendReply(bot, event.ReplyToken, "กรุณากรอกเลขบัตรประชาชน 13 หลักของผู้เข้ารับบริการ\nตัวอย่างเช่น 1234567891234 :")
 		return
 	}
 
-	// ตรวจสอบเลขประจำตัวประชาชน (cardID)
+	// ตรวจสอบเลขบัตรประชาชน
 	cardID := sanitizeCardID(message)
 	if len(cardID) != 13 {
 		sendReply(bot, event.ReplyToken, "กรุณากรอกเลขบัตรประชาชน 13 หลักที่ถูกต้อง\nตัวอย่างเช่น 1234567891234 :")
@@ -529,22 +551,22 @@ func handleServiceGetCardID(bot *linebot.Client, event *linebot.Event, State str
 	}
 	log.Println("เลขประจำตัวประชาชน:", cardID)
 
-	//ตรวจสอบว่ามีข้อมูลผู้ป่วยหรือไม่
+	// ตรวจสอบว่ามีข้อมูลผู้ป่วยหรือไม่
 	if _, err := GetPatientInfoByName(db, cardID); err != nil {
 		if err == sql.ErrNoRows {
-			sendReply(bot, event.ReplyToken, "ไม่พบข้อมูลผู้สูงอายุ กรุณากรอกเลขประจำตัวประชาชนอีกครั้ง")
+			sendReply(bot, event.ReplyToken, "ไม่พบข้อมูลผู้สูงอายุ กรุณากรอกเลขประจำตัวประชาชนอีกครั้ง.")
 		} else {
-			log.Println("Error models.GetServiceInfoBycardID:", err)
+			log.Println("Error GetPatientInfoByName:", err)
 			sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการค้นหาข้อมูล กรุณาลองใหม่.")
 		}
 		return
 	}
 
-	//บันทึก cardID สำหรับใช้ในฟังก์ชันถัดไป
+	// บันทึก cardID สำหรับใช้ในฟังก์ชันถัดไป
 	usercardidState[State] = cardID
 	setUserState(State, "wait status ActivitySelection")
 
-	//ใช้ `PushMessage()` แทน `ReplyMessage()` เพื่อหลีกเลี่ยงปัญหา reply token
+	// ใช้ `PushMessage()` แทน `ReplyMessage()` เพื่อหลีกเลี่ยงปัญหา reply token
 	flexMessage := flexmessage.FormatActivityCategories()
 	if _, err := bot.PushMessage(event.Source.UserID, flexMessage).Do(); err != nil {
 		log.Println("Error sending activity category selection:", err)
@@ -649,7 +671,6 @@ func fetchAndShowActivities(bot *linebot.Client, event *linebot.Event, State str
 	defer db.Close()
 
 	var activities []string
-
 	//ดึงข้อมูลกิจกรรมตามหมวดหมู่จากฐานข้อมูล
 	switch category {
 	case "technology":
@@ -658,12 +679,30 @@ func fetchAndShowActivities(bot *linebot.Client, event *linebot.Event, State str
 			for _, activity := range activityList {
 				activities = append(activities, strings.TrimSpace(activity.ActivityTechnology))
 			}
+			if len(activities) > 0 {
+				flexMessage := flexmessage.FormatActivitiestechnologyCarousel(activities)
+				if _, err := bot.PushMessage(event.Source.UserID, flexMessage).Do(); err != nil {
+					log.Println("Error sending activity list:", err)
+					sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการแสดงกิจกรรม กรุณาลองใหม่.")
+				}
+			} else {
+				sendReply(bot, event.ReplyToken, "ไม่พบกิจกรรมในหมวดหมู่นี้ กรุณาเลือกหมวดหมู่อื่น.")
+			}
 		}
 	case "social":
 		activityList, err := GetSocialActivities(db)
 		if err == nil {
 			for _, activity := range activityList {
 				activities = append(activities, strings.TrimSpace(activity.ActivitySocial))
+			}
+			if len(activities) > 0 {
+				flexMessage := flexmessage.FormatActivitiessocialCarousel(activities)
+				if _, err := bot.PushMessage(event.Source.UserID, flexMessage).Do(); err != nil {
+					log.Println("Error sending activity list:", err)
+					sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการแสดงกิจกรรม กรุณาลองใหม่.")
+				}
+			} else {
+				sendReply(bot, event.ReplyToken, "ไม่พบกิจกรรมในหมวดหมู่นี้ กรุณาเลือกหมวดหมู่อื่น.")
 			}
 		}
 	case "health":
@@ -672,12 +711,42 @@ func fetchAndShowActivities(bot *linebot.Client, event *linebot.Event, State str
 			for _, activity := range activityList {
 				activities = append(activities, strings.TrimSpace(activity.ActivityHealth))
 			}
+
+			if len(activities) > 0 {
+				flexMessages := flexmessage.FormatActivitieshealthCarousel(activities)
+
+				// แปลง []*linebot.FlexMessage -> []linebot.SendingMessage
+				messages := make([]linebot.SendingMessage, len(flexMessages))
+				for i, msg := range flexMessages {
+					messages[i] = msg
+				}
+
+				if _, err := bot.PushMessage(event.Source.UserID, messages...).Do(); err != nil {
+					log.Println("Error sending activity list:", err)
+					sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการแสดงกิจกรรม กรุณาลองใหม่.")
+				}
+			} else {
+				sendReply(bot, event.ReplyToken, "ไม่พบกิจกรรมในหมวดหมู่นี้ กรุณาเลือกหมวดหมู่อื่น.")
+			}
+		} else {
+			log.Println("Error fetching activities:", err)
+			sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการดึงข้อมูลกิจกรรม กรุณาลองใหม่.")
 		}
+
 	case "economic":
 		activityList, err := GetEconomicActivities(db)
 		if err == nil {
 			for _, activity := range activityList {
 				activities = append(activities, strings.TrimSpace(activity.ActivityEconomic))
+			}
+			if len(activities) > 0 {
+				flexMessage := flexmessage.FormatActivitieseconomicCarousel(activities)
+				if _, err := bot.PushMessage(event.Source.UserID, flexMessage).Do(); err != nil {
+					log.Println("Error sending activity list:", err)
+					sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการแสดงกิจกรรม กรุณาลองใหม่.")
+				}
+			} else {
+				sendReply(bot, event.ReplyToken, "ไม่พบกิจกรรมในหมวดหมู่นี้ กรุณาเลือกหมวดหมู่อื่น.")
 			}
 		}
 	case "environmental":
@@ -686,22 +755,72 @@ func fetchAndShowActivities(bot *linebot.Client, event *linebot.Event, State str
 			for _, activity := range activityList {
 				activities = append(activities, strings.TrimSpace(activity.ActivityEnvironmental))
 			}
+			if len(activities) > 0 {
+				flexMessage := flexmessage.FormatActivitiesenvironmentalCarousel(activities)
+				if _, err := bot.PushMessage(event.Source.UserID, flexMessage).Do(); err != nil {
+					log.Println("Error sending activity list:", err)
+					sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการแสดงกิจกรรม กรุณาลองใหม่.")
+				}
+			} else {
+				sendReply(bot, event.ReplyToken, "ไม่พบกิจกรรมในหมวดหมู่นี้ กรุณาเลือกหมวดหมู่อื่น.")
+			}
 		}
 	default:
 		log.Println("Invalid category selection:", category)
 		return
 	}
+	// //ดึงข้อมูลกิจกรรมตามหมวดหมู่จากฐานข้อมูล
+	// switch category {
+	// case "technology":
+	// 	activityList, err := GetTechnologyActivities(db)
+	// 	if err == nil {
+	// 		for _, activity := range activityList {
+	// 			activities = append(activities, strings.TrimSpace(activity.ActivityTechnology))
+	// 		}
+	// 	}
+	// case "social":
+	// 	activityList, err := GetSocialActivities(db)
+	// 	if err == nil {
+	// 		for _, activity := range activityList {
+	// 			activities = append(activities, strings.TrimSpace(activity.ActivitySocial))
+	// 		}
+	// 	}
+	// case "health":
+	// 	activityList, err := GetHealthActivities(db)
+	// 	if err == nil {
+	// 		for _, activity := range activityList {
+	// 			activities = append(activities, strings.TrimSpace(activity.ActivityHealth))
+	// 		}
+	// 	}
+	// case "economic":
+	// 	activityList, err := GetEconomicActivities(db)
+	// 	if err == nil {
+	// 		for _, activity := range activityList {
+	// 			activities = append(activities, strings.TrimSpace(activity.ActivityEconomic))
+	// 		}
+	// 	}
+	// case "environmental":
+	// 	activityList, err := GetEnvironmentalActivities(db)
+	// 	if err == nil {
+	// 		for _, activity := range activityList {
+	// 			activities = append(activities, strings.TrimSpace(activity.ActivityEnvironmental))
+	// 		}
+	// 	}
+	// default:
+	// 	log.Println("Invalid category selection:", category)
+	// 	return
+	// }
 
 	//แสดง Flex Message ให้ผู้ใช้เลือกกิจกรรม
-	if len(activities) > 0 {
-		flexMessage := flexmessage.FormatActivities(activities)
-		if _, err := bot.PushMessage(event.Source.UserID, flexMessage).Do(); err != nil {
-			log.Println("Error sending activity list:", err)
-			sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการแสดงกิจกรรม กรุณาลองใหม่.")
-		}
-	} else {
-		sendReply(bot, event.ReplyToken, "ไม่พบกิจกรรมในหมวดหมู่นี้ กรุณาเลือกหมวดหมู่อื่น.")
-	}
+	// if len(activities) > 0 {
+	// 	flexMessage := flexmessage.FormatActivities(activities)
+	// 	if _, err := bot.PushMessage(event.Source.UserID, flexMessage).Do(); err != nil {
+	// 		log.Println("Error sending activity list:", err)
+	// 		sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการแสดงกิจกรรม กรุณาลองใหม่.")
+	// 	}
+	// } else {
+	// 	sendReply(bot, event.ReplyToken, "ไม่พบกิจกรรมในหมวดหมู่นี้ กรุณาเลือกหมวดหมู่อื่น.")
+	// }
 
 	//อัปเดตสถานะเป็น "รอเลือกกิจกรรม"
 	setUserState(State, "wait status Activityrecord")
@@ -1155,7 +1274,7 @@ func handlesaveEvidenceImagebeforeActivity(bot *linebot.Client, event *linebot.E
 		return err
 	}
 	bucketName := "nirunimages"
-	objectName := fmt.Sprintf("Imgage before activity/%s/%d/%s.jpg", activity, patientInfoID, messageID)
+	objectName := fmt.Sprintf("Image before activity/%s/%d/%s.jpg", activity, patientInfoID, messageID)
 
 	// อัปโหลดไฟล์ไปยัง MinIO
 	fileURL, err := UploadFileToMinIO(minioClient, bucketName, objectName, tempFilePath)
@@ -1238,7 +1357,7 @@ func handlesaveEvidenceImageafterActivity(bot *linebot.Client, event *linebot.Ev
 			return err
 		}
 		bucketName := "nirunimages"
-		objectName := fmt.Sprintf("Imgage after activity/%s/%d/%s.jpg", activity, patientInfoID, messageID)
+		objectName := fmt.Sprintf("Image after activity/%s/%d/%s.jpg", activity, patientInfoID, messageID)
 
 		// อัปโหลดไฟล์ไปยัง MinIO
 		fileURL, err := UploadFileToMinIO(minioClient, bucketName, objectName, tempFilePath)
@@ -1270,76 +1389,76 @@ func handlesaveEvidenceImageafterActivity(bot *linebot.Client, event *linebot.Ev
 }
 func handleUserChoiceForActivityRecord(bot *linebot.Client, event *linebot.Event, userID, selection string) {
 	if userState[userID] != "wait status ConfirmOrSaveEmployee" {
-		log.Printf("❌ Invalid state for user %s. Current state: %s", userID, userState[userID])
+		log.Printf("Invalid state for user %s. Current state: %s", userID, userState[userID])
 		return
 	}
 
 	selection = strings.TrimSpace(selection)
-	log.Printf("📌 Received selection: %s", selection)
+	log.Printf("Received selection: %s", selection)
 
 	switch selection {
 	case "บันทึกข้อมูลแทน", "save_employee", "บันทึกข้อมูล":
-		log.Printf("✅ User %s selected to save record for another employee", userID)
+		log.Printf("User %s selected to save record for another employee", userID)
 		userState[userID] = "wait status saveActivityRecordForOtherEmployee"
 		saveActivityRecordForOtherEmployee(bot, event, userID)
 
 	case "ยืนยันการบันทึก", "confirm", "ยืนยัน":
-		log.Printf("✅ User %s selected to confirm activity record", userID)
+		log.Printf("User %s selected to confirm activity record", userID)
 		userState[userID] = "wait status confirmActivityRecordByUser"
 		confirmActivityRecordByUser(bot, event, userID)
 
 	default:
-		log.Printf("❌ Invalid selection by user %s: %s", userID, selection)
-		sendReply(bot, event.ReplyToken, "❌ ตัวเลือกไม่ถูกต้อง กรุณาลองใหม่.\nกรุณาเลือก:\n- ยืนยันการบันทึก\n- บันทึกข้อมูลแทน")
+		log.Printf("Invalid selection by user %s: %s", userID, selection)
+		sendReply(bot, event.ReplyToken, "ตัวเลือกไม่ถูกต้อง กรุณาลองใหม่.\nกรุณาเลือก:\n- ยืนยันการบันทึก\n- บันทึกข้อมูลแทน")
 	}
 }
 
 func confirmActivityRecordByUser(bot *linebot.Client, event *linebot.Event, userID string) {
 	if userState[userID] != "wait status confirmActivityRecordByUser" {
-		log.Printf("❌ Invalid state for user %s. Current state: %s", userID, userState[userID])
+		log.Printf("Invalid state for user %s. Current state: %s", userID, userState[userID])
 		return
 	}
 
 	db, err := database.ConnectToDB()
 	if err != nil {
-		log.Printf("❌ Database connection error: %v", err)
+		log.Printf("Database connection error: %v", err)
 		sendReply(bot, event.ReplyToken, "ไม่สามารถเชื่อมต่อฐานข้อมูลได้ กรุณาลองใหม่.")
 		return
 	}
 	defer db.Close()
 
-	// ✅ ดึง activity_record_id ที่เพิ่งบันทึก
+	// ดึง activity_record_id ที่เพิ่งบันทึก
 	activityRecord, err := GetLatestActivityRecord(db, userID)
 	if err != nil {
-		log.Printf("❌ ไม่พบข้อมูลกิจกรรมสำหรับ UserID: %s", userID)
+		log.Printf("ไม่พบข้อมูลกิจกรรมสำหรับ UserID: %s", userID)
 		sendReply(bot, event.ReplyToken, "ไม่พบข้อมูลกิจกรรม กรุณาลองใหม่.")
 		return
 	}
 
-	// ✅ ตรวจสอบสิทธิ์พนักงาน
+	// ตรวจสอบสิทธิ์พนักงาน
 	userInfo, err := GetUserInfoByLINEID(db, userID)
 	if err != nil || userInfo.EmployeeInfo.EmployeeInfo_ID == 0 {
-		log.Printf("❌ User %s is not an employee", userID)
+		log.Printf("User %s is not an employee", userID)
 		sendReply(bot, event.ReplyToken, "คุณไม่มีสิทธิ์ยืนยัน กรุณาเลือก 'บันทึกข้อมูลแทน'")
 		return
 	}
 
-	// ✅ บันทึก employee_info_id ลง activity_record
+	// บันทึก employee_info_id ลง activity_record
 	err = UpdateActivityEmployeeID(db, activityRecord.ActivityRecord_ID, userInfo.EmployeeInfo.EmployeeInfo_ID, userInfo.UserInfo_ID)
 	if err != nil {
-		log.Printf("❌ Error updating employee_info_id: %v", err)
+		log.Printf("Error updating employee_info_id: %v", err)
 		sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการบันทึก กรุณาลองใหม่.")
 		return
 	}
 
-	sendReply(bot, event.ReplyToken, "✅ บันทึกกิจกรรมสำเร็จ!")
+	sendReply(bot, event.ReplyToken, "บันทึกกิจกรรมสำเร็จ!")
 	userState[userID] = ""
 }
 
-// ✅ ฟังก์ชันให้ผู้ใช้กรอกชื่อพนักงานแทน
+// ฟังก์ชันให้ผู้ใช้กรอกชื่อพนักงานแทน
 func saveActivityRecordForOtherEmployee(bot *linebot.Client, event *linebot.Event, userID string) {
 	if userState[userID] != "wait status saveActivityRecordForOtherEmployee" {
-		log.Printf("❌ Invalid state for user %s. Current state: %s", userID, userState[userID])
+		log.Printf("Invalid state for user %s. Current state: %s", userID, userState[userID])
 		return
 	}
 
@@ -1347,11 +1466,10 @@ func saveActivityRecordForOtherEmployee(bot *linebot.Client, event *linebot.Even
 	userState[userID] = "wait status SaveEmployeeName"
 }
 
-// ✅ ฟังก์ชันบันทึกชื่อพนักงานที่ทำการบริการแทน
-
+// ฟังก์ชันบันทึกชื่อพนักงานที่ทำการบริการแทน
 func handleSaveEmployeeName(bot *linebot.Client, event *linebot.Event, userID, State, employeeName string) {
-	// 🔍 ตรวจสอบค่าที่ได้รับ
-	// log.Printf("📌 User %s entered employee name (before trim): '%s'", userID, employeeName)
+	// ตรวจสอบค่าที่ได้รับ
+	// log.Printf("User %s entered employee name (before trim): '%s'", userID, employeeName)
 
 	employeeName = strings.TrimSpace(event.Message.(*linebot.TextMessage).Text)
 	log.Printf("Received employee name: %s", employeeName)
@@ -1359,61 +1477,84 @@ func handleSaveEmployeeName(bot *linebot.Client, event *linebot.Event, userID, S
 		sendReply(bot, event.ReplyToken, "กรุณากรอกชื่อพนักงานที่ให้บริการ.")
 		return
 	}
-	// 🛑 ตรวจสอบว่าค่าที่รับมาเป็นค่าว่างหรือไม่
-	if employeeName == "" {
-		sendReply(bot, event.ReplyToken, "กรุณากรอกชื่อพนักงานที่ให้บริการแทน")
-		return
-	}
+	// //ตรวจสอบว่าค่าที่รับมาเป็นค่าว่างหรือไม่
+	// if employeeName == "" {
+	// 	sendReply(bot, event.ReplyToken, "กรุณากรอกชื่อพนักงานที่ให้บริการแทน")
+	// 	return
+	// }
 
 	db, err := database.ConnectToDB()
 	if err != nil {
-		log.Printf("❌ Database connection error: %v", err)
+		log.Printf("Database connection error: %v", err)
 		sendReply(bot, event.ReplyToken, "ไม่สามารถเชื่อมต่อฐานข้อมูลได้ กรุณาลองใหม่.")
 		return
 	}
 	defer db.Close()
 
-	// ✅ ค้นหา employeeID จากชื่อที่ถูกลบคำนำหน้าแล้ว
+	// ✅ ค้นหา employeeID
 	employeeID, err := GetEmployeeIDByName(db, employeeName)
 	if err != nil {
-		log.Printf("❌ ไม่พบข้อมูล employee_info_id สำหรับพนักงาน: '%s'", employeeName)
+		log.Printf("ไม่พบข้อมูล employee_info_id สำหรับพนักงาน: '%s'", employeeName)
 		sendReply(bot, event.ReplyToken, fmt.Sprintf("ไม่พบพนักงานชื่อ %s\nกรุณากรอกชื่อใหม่", employeeName))
 		return
 	}
 
-	log.Printf("✅ Employee ID found: %d for name: %s", employeeID, employeeName)
+	log.Printf("Employee ID found: %d for name: %s", employeeID, employeeName)
 
-	// ✅ อัปเดตข้อมูลใน activity_record
+	//อัปเดตข้อมูลใน activity_record
 	cardID := usercardidState[State]
 	patient, err := GetPatientInfoByName(db, cardID)
 	if err != nil {
-		log.Printf("❌ Error fetching patient_info_id: %v", err)
+		log.Printf("Error fetching patient_info_id: %v", err)
 		sendReply(bot, event.ReplyToken, "ไม่พบข้อมูลผู้ป่วย กรุณาลองใหม่")
 		return
 	}
-	patientInfoID := patient.PatientInfo.PatientInfo_ID
-	if patientInfoID == 0 {
-		sendReply(bot, event.ReplyToken, "ไม่พบรหัสข้อมูลผู้ป่วย กรุณาลองใหม่")
-		return
-	}
-
-	activityRecord, err := GetLatestActivityRecordByPatientID(db, patientInfoID)
+	//ดึงข้อมูลผู้ใช้ตาม LINE ID
+	userInfo, err := GetUserInfoByLINEID(db, userID)
 	if err != nil {
-		log.Printf("⚠️ ไม่พบข้อมูลกิจกรรมล่าสุดสำหรับ PatientInfo_ID: %d", patientInfoID)
-		sendReply(bot, event.ReplyToken, "⚠️ ไม่พบข้อมูลกิจกรรม กรุณาลองใหม่ หรือ ตรวจสอบว่ากิจกรรมถูกบันทึกเสร็จสิ้นแล้ว")
+		log.Println("Error fetching user info:", err)
+		sendReply(bot, event.ReplyToken, "ไม่พบข้อมูลผู้ใช้ กรุณาลองใหม่.")
 		return
 	}
-
-	log.Printf("✅ Updating employee_info_id=%d for ActivityRecord_ID=%d", employeeID, activityRecord.ActivityRecord_ID)
-
-	err = UpdateActivityEmployeeID(db, activityRecord.ActivityRecord_ID, employeeID, 0)
+	// ดึง Activity Record ID
+	activityRecordID, err := GetActivityRecordID(db, cardID)
 	if err != nil {
-		log.Printf("❌ Error updating employee_info_id: %v", err)
-		sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการบันทึก กรุณาลองใหม่.")
+		sendReply(bot, event.ReplyToken, err.Error())
 		return
 	}
+	// เตรียมข้อมูล activityRecord
+	activityRecord := &models.Activityrecord{
+		ActivityRecord_ID: activityRecordID.ActivityRecord_ID,
+		PatientInfo: models.PatientInfo{
+			CardID:         cardID,
+			Name:           patient.PatientInfo.Name,
+			PatientInfo_ID: patient.PatientInfo.PatientInfo_ID,
+		},
+		EmployeeInfo: models.EmployeeInfo{EmployeeInfo_ID: employeeID},
+		UserInfo:     models.User_info{UserInfo_ID: userInfo.UserInfo_ID},
+	}
 
-	sendReply(bot, event.ReplyToken, "✅ บันทึกข้อมูลพนักงานสำเร็จ!")
+	log.Printf("Updating employee_info_id=%d for ActivityRecord_ID=%d", employeeID, activityRecord.ActivityRecord_ID)
+
+	if err := UpdateActivityEmployee(db, activityRecord); err != nil {
+		log.Printf("Error updating end time: %v", err)
+			sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการบันทึกเวลาสิ้นสุด กรุณาลองใหม่")
+			return
+		}
+		flexMessage := flexmessage.FormatactivityRecordEndtime([]models.Activityrecord{*activityRecord})
+	if _, err := bot.ReplyMessage(event.ReplyToken, flexMessage).Do(); err != nil {
+		log.Printf("Error sending reply message: %v", err)
+		sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการส่งข้อความ กรุณาลองใหม่.")
+		return
+	}
+	// err = UpdateActivityEndTimeForPatient(db, activityRecord.ActivityRecord_ID, employeeID, 0)
+	// if err != nil {
+	// 	log.Printf("Error updating employee_info_id: %v", err)
+	// 	sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการบันทึก กรุณาลองใหม่.")
+	// 	return
+	// }
+
+	sendReply(bot, event.ReplyToken, "บันทึกข้อมูลพนักงานสำเร็จ!")
 	userState[userID] = ""
 }
 
