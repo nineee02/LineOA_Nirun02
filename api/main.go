@@ -11,12 +11,12 @@ import (
 )
 
 func generateQRCode() {
-	url := "https://access.line.me/oauth2/v2.1/authorize?response_type=code&client_id=2006767645&redirect_uri=http%3A%2F%2Fcommunity.app.nirun.life%2Fauth_oauth%2Fsignin&state=random_string&scope=profile%20openid%20email"
+	url := "https://access.line.me/oauth2/v2.1/authorize?response_type=code&client_id=2006878417&redirect_uri=http%3A%2F%2Fcommunity.app.nirun.life%2Fauth_oauth%2Fsignin&state=random_string&scope=profile+openid+email"
 	err := qrcode.WriteFile(url, qrcode.Medium, 256, "qrcode_line_login.png")
 	if err != nil {
 		log.Fatalf("Failed to generate QR Code: %v", err)
 	}
-	log.Println("QR Code generated successfully.")
+	// log.Println("QR Code generated successfully.")
 }
 
 func main() {
@@ -29,10 +29,11 @@ func main() {
 
 	router := gin.Default()
 
-	router.POST("/webhook", hook.HandleLineWebhook)
 	router.GET("/login", event.LineLoginHandler)
-
+	// router.GET("/auth_oauth/signin", event.LineLoginCallback)
+	// log.Println("✅ Registering route: /auth_oauth/signin")
 	router.GET("/callback", event.LineLoginCallback)
+	router.POST("/webhook", hook.HandleLineWebhook)
 
 	router.Run(":8080")
 }

@@ -147,8 +147,8 @@ func GetWorktimeRecordByUserID(db *sql.DB, UserInfo_ID int) (*models.WorktimeRec
 		LIMIT 1;`
 
 	row := db.QueryRow(query, UserInfo_ID)
-	log.Println("Executing query:", query)
-	log.Printf("Query parameter userID: %d", UserInfo_ID)
+	// log.Println("Executing query:", query)
+	// log.Printf("Query parameter userID: %d", UserInfo_ID)
 
 	worktimeRecord := &models.WorktimeRecord{
 		UserInfo: &models.User_info{},
@@ -173,7 +173,7 @@ func GetWorktimeRecordByUserID(db *sql.DB, UserInfo_ID int) (*models.WorktimeRec
 		return nil, fmt.Errorf("error fetching worktime record: %v", err)
 	}
 
-	log.Printf("Fetched worktime record: %+v", worktimeRecord)
+	// log.Printf("Fetched worktime record: %+v", worktimeRecord)
 	return worktimeRecord, nil
 }
 
@@ -982,7 +982,7 @@ func UploadFileToMinIO(client *minio.Client, bucketName, objectName, filePath st
 	}
 
 	// สร้าง Public URL สำหรับไฟล์
-	fileURL := fmt.Sprintf("http://10.221.43.191:9000/%s/%s", bucketName, objectName)
+	fileURL := fmt.Sprintf("http://172.20.10.3:9000/%s/%s", bucketName, objectName)
 	return fileURL, nil
 }
 

@@ -978,16 +978,16 @@ func FormatActivityCategories() *linebot.FlexMessage {
 							Type:   linebot.FlexComponentTypeText,
 							Text:   "เลือกมิติของกิจกรรม:",
 							Weight: linebot.FlexTextWeightTypeBold,
-							Size:   linebot.FlexTextSizeTypeXl,
-							Color:  "#FFFFFF",
+							Size:   linebot.FlexTextSizeTypeLg,
+							Color:  "#4a154b",
 							//Margin: linebot.FlexComponentMarginTypeNone,
 							Align: linebot.FlexComponentAlignTypeStart,
 						},
-						// &linebot.SeparatorComponent{
-						// 	Type:   linebot.FlexComponentTypeSeparator,
-						// 	Color:  "#58BDCF",
-						// 	Margin: linebot.FlexComponentMarginTypeXl,
-						// },
+						&linebot.SeparatorComponent{
+							Type:   linebot.FlexComponentTypeSeparator,
+							Color:  "#4a154b",
+							Margin: linebot.FlexComponentMarginTypeXl,
+						},
 						&linebot.ButtonComponent{
 							Type: linebot.FlexComponentTypeButton,
 							Action: &linebot.MessageAction{
@@ -995,8 +995,8 @@ func FormatActivityCategories() *linebot.FlexMessage {
 								Text:  "มิติเทคโนโลยี",
 							},
 							Style: linebot.FlexButtonStyleTypePrimary,
-							Color: "#fc53c1",
-						},
+							Color: "#E36BAE", // สีชมพูพาสเทล
+						},						
 						&linebot.ButtonComponent{
 							Type: linebot.FlexComponentTypeButton,
 							Action: &linebot.MessageAction{
@@ -1048,7 +1048,7 @@ func FormatActivityCategories() *linebot.FlexMessage {
 		},
 		Styles: &linebot.BubbleStyle{
 			Body: &linebot.BlockStyle{
-				BackgroundColor: "#F3D85BFF",
+				BackgroundColor: "#F7E7A0",
 			},
 		},
 	}
