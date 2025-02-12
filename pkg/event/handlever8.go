@@ -579,6 +579,7 @@ package event
 
 // 	return finalTime, nil
 // }
+
 // func handleServiceGetCardID(bot *linebot.Client, event *linebot.Event, State string) {
 // 	if userState[State] != "wait status handleServiceGetCardID" {
 // 		log.Printf("Invalid state for user %s. Current state: %s", State, userState[State])
