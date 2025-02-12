@@ -30,9 +30,8 @@ func main() {
 	router := gin.Default()
 
 	router.GET("/login", event.LineLoginHandler)
-	// router.GET("/auth_oauth/signin", event.LineLoginCallback)
-	// log.Println("✅ Registering route: /auth_oauth/signin")
-	router.GET("/callback", event.LineLoginCallback)
+	router.GET("/auth_oauth/signin", event.LineLoginCallback)
+	// router.GET("/callback", event.LineLoginCallback)
 	router.POST("/webhook", hook.HandleLineWebhook)
 
 	router.Run(":8080")

@@ -982,7 +982,7 @@ func UploadFileToMinIO(client *minio.Client, bucketName, objectName, filePath st
 	}
 
 	// สร้าง Public URL สำหรับไฟล์
-	fileURL := fmt.Sprintf("http://172.20.10.3:9000/%s/%s", bucketName, objectName)
+	fileURL := fmt.Sprintf("http://10.221.41.215:9000/%s/%s", bucketName, objectName)
 	return fileURL, nil
 }
 

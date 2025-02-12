@@ -9,6 +9,7 @@ import (
 	"nirun/pkg/flexmessage"
 	"nirun/pkg/models"
 	"regexp"
+	"strconv"
 	"unicode"
 
 	// "nirun/service"
@@ -27,6 +28,8 @@ var userLastWorktimeAction = make(map[string]time.Time) // เก็บ timestam
 var userActivityInfoID = make(map[string]int)           // เก็บ activity_info_id ตาม userID
 var userActivityRecordID = make(map[string]int)         // เก็บ activityRecord_ID ตาม State ของผู้ใช้
 var userActivityCategory = make(map[string]string)      // เก็บมิติของกิจกรรมที่เลือก
+var userActivityStartDate = make(map[string]time.Time)  // เก็บวันที่เริ่มกิจกรรม
+var userActivityEndDate = make(map[string]time.Time)    // เก็บวันที่สิ้นสุดกิจกรรม
 var employeeLoginStatus = make(map[string]string)       // เก็บสถานะล็อกอิน {employeeID: userID}
 var userImageTimestamps = make(map[string]time.Time)    // เก็บ timestamp ของรูปภาพ
 
@@ -105,23 +108,29 @@ func HandleEvent(bot *linebot.Client, event *linebot.Event) {
 				handleCustomActivity(bot, event, State)
 			case "wait status Activityrecord":
 				handleActivityrecord(bot, event, State)
+			// case "wait status ActivityStartDate":
+			// 	handleActivityStartDate(bot, event, State)
+			// case "wait status ActivityStartTime":
+			// 	handleActivityStartTime(bot, event, State)
+			// case "wait status ActivityEndDate":
+			// 	handleActivityEndDate(bot, event, State)
+			// case "wait status ActivityEndTime":
+			// 	handleActivityEndTime(bot, event, State)
 			case "wait status ActivityStart":
 				handleActivityStart(bot, event, State)
 			case "wait status ActivityEnd":
 				handleActivityEnd(bot, event, State)
+
 			// case "wait status ConfirmOrSaveEmployee":
 			// 	handleUserChoiceForActivityRecord(bot, event, State, "")
 			case "wait status ConfirmOrSaveEmployee":
 				if textMessage, ok := event.Message.(*linebot.TextMessage); ok {
-					selection := strings.TrimSpace(textMessage.Text)  // รับข้อความที่ผู้ใช้ส่งมา
-					log.Printf("📌 Handling selection: %s", selection) // เพิ่ม log ตรวจสอบค่า
+					selection := strings.TrimSpace(textMessage.Text) // รับข้อความที่ผู้ใช้ส่งมา
+					log.Printf("Handling selection: %s", selection)  // เพิ่ม log ตรวจสอบค่า
 					handleUserChoiceForActivityRecord(bot, event, State, selection)
 				} else {
-					log.Printf("❌ Unexpected message type in ConfirmOrSaveEmployee state")
-					// sendReply(bot, event.ReplyToken, "กรุณาเลือก 'ยืนยันการบันทึก' หรือ 'บันทึกข้อมูลแทน'")
+					log.Printf("Unexpected message type in ConfirmOrSaveEmployee state")
 				}
-			// case "wait status saveActivityRecordForOtherEmployee":
-			// 	saveActivityRecordForOtherEmployee(bot, event, State)
 			case "wait status SaveEmployeeName":
 				handleSaveEmployeeName(bot, event, State, State, "")
 			default:
@@ -561,31 +570,65 @@ func isNumeric(s string) bool {
 	}
 	return true
 }
-func parseTimeInput(input string) (time.Time, error) {
-	// 🔹 ลบช่องว่างส่วนเกิน และทำให้เป็น lower case
-	input = strings.TrimSpace(strings.ToLower(input))
 
-	// 🔹 กำหนด regex ให้รับค่าหลายรูปแบบ
-	re := regexp.MustCompile(`(\d{1,2})[:.](\d{2})`) // รองรับ "11:00", "11.00"
-	match := re.FindStringSubmatch(input)
+// func parseDateInput(input string) (time.Time, error) {
+// 	// 🔹 ลบช่องว่างส่วนเกิน และเปลี่ยนเป็น lower case
+// 	input = strings.TrimSpace(strings.ToLower(input))
 
-	if len(match) < 3 {
-		return time.Time{}, fmt.Errorf("รูปแบบเวลาไม่ถูกต้อง")
-	}
+// 	// 🔹 กำหนด regex สำหรับจับวันและเดือน/ปี
+// 	re := regexp.MustCompile(`^(\d{1,2})/(\d{1,2})/(\d{4})$`)
+// 	match := re.FindStringSubmatch(input)
 
-	// 🔹 แปลงชั่วโมงและนาทีเป็นตัวเลข
-	hour, min := match[1], match[2]
-	parsedTime, err := time.Parse("15:04", fmt.Sprintf("%s:%s", hour, min))
-	if err != nil {
-		return time.Time{}, fmt.Errorf("เกิดข้อผิดพลาดในการแปลงเวลา")
-	}
+// 	if len(match) == 0 {
+// 		return time.Time{}, fmt.Errorf("รูปแบบวันที่ไม่ถูกต้อง กรุณากรอกเป็น วัน/เดือน/ปี เช่น 01/01/2567")
+// 	}
 
-	// 🔹 ใช้วันปัจจุบัน และนำเวลาเข้าไปใช้
-	now := time.Now()
-	finalTime := time.Date(now.Year(), now.Month(), now.Day(), parsedTime.Hour(), parsedTime.Minute(), 0, 0, now.Location())
+// 	// 🔹 ดึงค่าจาก regex match
+// 	day, month, yearStr := match[1], match[2], match[3]
 
-	return finalTime, nil
-}
+// 	// 🔹 แปลงปีเป็น int
+// 	year, _ := strconv.Atoi(yearStr)
+
+// 	// 🔹 ตรวจสอบว่าปีเป็น พ.ศ. หรือไม่
+// 	if year > 2500 {
+// 		year -= 543 // แปลง พ.ศ. → ค.ศ.
+// 	}
+
+// 	// 🔹 สร้างวันที่โดยไม่มีเวลา
+// 	dateStr := fmt.Sprintf("%s/%s/%d", day, month, year)
+// 	layout := "02/01/2006"
+// 	parsedDate, err := time.Parse(layout, dateStr)
+// 	if err != nil {
+// 		return time.Time{}, fmt.Errorf("ไม่สามารถแปลงวันได้")
+// 	}
+
+// 	return parsedDate, nil
+// }
+
+// func parseTimeInput(input string) (time.Time, error) {
+// 	// 🔹 ลบช่องว่างส่วนเกิน และเปลี่ยนเป็น lower case
+// 	input = strings.TrimSpace(strings.ToLower(input))
+
+// 	// 🔹 กำหนด regex สำหรับจับเวลา
+// 	re := regexp.MustCompile(`^(\d{1,2})[:.](\d{2})\s*(น\.?|น)?$`)
+// 	match := re.FindStringSubmatch(input)
+
+// 	if len(match) == 0 {
+// 		return time.Time{}, fmt.Errorf("รูปแบบเวลาไม่ถูกต้อง กรุณากรอกเป็น ชั่วโมง:นาที เช่น 11:20 น.")
+// 	}
+
+// 	// 🔹 ดึงค่าจาก regex match
+// 	hour, min := match[1], match[2]
+
+// 	// 🔹 แปลงค่าเป็นตัวเลข
+// 	hourInt, _ := strconv.Atoi(hour)
+// 	minInt, _ := strconv.Atoi(min)
+
+// 	// 🔹 สร้างเวลา
+// 	return time.Date(0, 0, 0, hourInt, minInt, 0, 0, time.UTC), nil
+// }
+
+
 func handleServiceGetCardID(bot *linebot.Client, event *linebot.Event, State string) {
 	if userState[State] != "wait status handleServiceGetCardID" {
 		log.Printf("Invalid state for user %s. Current state: %s", State, userState[State])
@@ -964,7 +1007,7 @@ func handleCustomActivity(bot *linebot.Client, event *linebot.Event, State strin
 
 	//เปลี่ยนสถานะเป็น "รอเริ่มกิจกรรม"
 	userState[State] = "wait status ActivityStart"
-	sendReply(bot, event.ReplyToken, "กรุณากรอกวันที่และเวลาเริ่มต้นของกิจกรรม เช่น 01/01/2024 (วัน/เดือน/ปี) 11:20 น.")
+	sendReply(bot, event.ReplyToken, "กรุณากรอกวัน/เดือน/ปี เริ่มต้นของกิจกรรม\nเช่น 01/01/2567")
 }
 
 // บันทึกกิจกรรม เมื่อเลือกกิจกรรมใหม่แล้ว
@@ -1104,7 +1147,42 @@ func handleActivityrecord(bot *linebot.Client, event *linebot.Event, State strin
 	// อัปเดตสถานะเป็น "wait status ActivityStart"
 	userState[State] = "wait status ActivityStart"
 	log.Println("wait status ActivityStart: ", userState)
-	sendReply(bot, event.ReplyToken, "กรุณากรอกวันที่และเวลาเริ่มต้นของกิจกรรม เช่น 01/01/2024 (วัน/เดือน/ปี) 11:20 น.")
+	sendReply(bot, event.ReplyToken, "กรุณากรอกวัน/เดือน/ปี เริ่มต้นของกิจกรรม\nเช่น 01/01/2567 11:20 น. หรือ\n01/01/2567 เวลา 11:20 น.")
+}
+
+func parseTimeInput(input string) (time.Time, error) {
+	// 🔹 ลบช่องว่างส่วนเกิน และเปลี่ยนเป็น lower case
+	input = strings.TrimSpace(strings.ToLower(input))
+
+	// 🔹 กำหนด regex ให้รองรับทุกกรณี
+	re := regexp.MustCompile(`^(\d{1,2})/(\d{1,2})/(\d{4})\s*(เวลา)?\s*(\d{1,2})[:.](\d{2})\s*(น\.?|น)?$`)
+	match := re.FindStringSubmatch(input)
+
+	if len(match) == 0 {
+		return time.Time{}, fmt.Errorf("รูปแบบวันและเวลาไม่ถูกต้อง กรุณากรอกเป็น วัน/เดือน/ปี ชั่วโมง:นาที เช่น 01/01/2567 11:20 น.")
+	}
+
+	// 🔹 ดึงค่าจาก regex match
+	day, month, yearStr := match[1], match[2], match[3]
+	hour, min := match[5], match[6]
+
+	// 🔹 แปลงปีเป็น int
+	year, _ := strconv.Atoi(yearStr)
+
+	// 🔹 ตรวจสอบว่าปีเป็น พ.ศ. หรือไม่
+	if year > 2500 {
+		year -= 543 // แปลง พ.ศ. → ค.ศ.
+	}
+
+	// 🔹 ใช้ time.Parse() ตรวจสอบความถูกต้อง
+	dateTimeStr := fmt.Sprintf("%s/%s/%d %s:%s", day, month, year, hour, min)
+	layout := "02/01/2006 15:04"
+	parsedTime, err := time.Parse(layout, dateTimeStr)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("ไม่สามารถแปลงวันและเวลาได้")
+	}
+
+	return parsedTime, nil
 }
 
 // กดเรื่มกิจกรรม
@@ -1113,7 +1191,7 @@ func handleActivityStart(bot *linebot.Client, event *linebot.Event, State string
 
 	if userState[State] != "wait status ActivityStart" {
 		log.Printf("Invalid state for user %s. Current state: %s", State, userState[State])
-		sendReply(bot, event.ReplyToken, "กรุณากรอกวันที่และเวลาเริ่มต้นของกิจกรรม เช่น ")
+		sendReply(bot, event.ReplyToken, "กรุณากรอกวันที่และเวลาเริ่มต้นของกิจกรรม\nเช่น 01/01/2567 11:20 น. หรือ\n01/01/2567 เวลา 11:20 น. ")
 		return
 	}
 
@@ -1128,7 +1206,7 @@ func handleActivityStart(bot *linebot.Client, event *linebot.Event, State string
 
 	startTime, err := parseTimeInput(startTimeStr)
 	if err != nil {
-		sendReply(bot, event.ReplyToken, "รูปแบบเวลาไม่ถูกต้อง ตัวอย่างเช่น 01/01/2024 (วัน/เดือน/ปี) 11:20 น.")
+		sendReply(bot, event.ReplyToken, "รูปแบบเวลาไม่ถูกต้อง ตัวอย่างเช่น 01/01/2567 11:20 น. หรือ\n01/01/2567 เวลา 11:20 น.")
 		return
 	}
 
@@ -1181,7 +1259,7 @@ func handleActivityStart(bot *linebot.Client, event *linebot.Event, State string
 		}
 		userInfoID := userInfo.UserInfo_ID
 
-		// ✅ ตรวจสอบว่าเป็น "มิติอื่นๆ" หรือไม่
+		//ตรวจสอบว่าเป็น "มิติอื่นๆ" หรือไม่
 		activityInfoID, exists := userActivityInfoID[State]
 		activityOther := ""
 		if category == "other" {
@@ -1205,13 +1283,13 @@ func handleActivityStart(bot *linebot.Client, event *linebot.Event, State string
 
 	userState[State] = "wait status ActivityEnd"
 	log.Printf("Updating userState for %s to wait status ActivityEnd", State)
-	sendReply(bot, event.ReplyToken, "กรุณากรอกวันที่และเวลาสิ้นสุดของกิจกรรม เช่น 01/01/2024 (วัน/เดือน/ปี) 11:20 น.")
+	sendReply(bot, event.ReplyToken, "กรุณากรอกวันที่และเวลาสิ้นสุดของกิจกรรม\nเช่น 01/01/2567 11:20 น. หรือ\n01/01/2567 เวลา 11:20 น.")
 }
 
 func handleActivityEnd(bot *linebot.Client, event *linebot.Event, State string) {
 	if userState[State] != "wait status ActivityEnd" {
 		log.Printf("Invalid state for user %s. Current state: %s", State, userState[State])
-		sendReply(bot, event.ReplyToken, "กรุณากรอกวันที่และเวลาสิ้นสุดของกิจกรรม เช่น 01/01/2024 (วัน/เดือน/ปี) 11:20 น.")
+		sendReply(bot, event.ReplyToken, "กรุณากรอกวันที่และเวลาสิ้นสุดของกิจกรรม\nเช่น 01/01/2567 11:20 น. หรือ\n01/01/2567 เวลา 11:20 น.")
 		return
 	}
 
@@ -1225,16 +1303,16 @@ func handleActivityEnd(bot *linebot.Client, event *linebot.Event, State string) 
 	endTimeStr := strings.TrimSpace(message.Text)
 	log.Printf("Received end time input: %s", endTimeStr)
 
-	// ✅ ใช้ฟังก์ชัน parseTimeInput() แปลงค่า
+	// ใช้ฟังก์ชัน parseTimeInput() แปลงค่า
 	endTime, err := parseTimeInput(endTimeStr)
 	if err != nil {
-		sendReply(bot, event.ReplyToken, "รูปแบบเวลาไม่ถูกต้อง ตัวอย่างเช่น 01/01/2024 (วัน/เดือน/ปี) 11:20 น.")
+		sendReply(bot, event.ReplyToken, "รูปแบบเวลาไม่ถูกต้อง ตัวอย่างเช่น 01/01/2567 11:20 น. หรือ\n01/01/2567 เวลา 11:20 น.")
 		return
 	}
 
 	db, err := database.ConnectToDB()
 	if err != nil {
-		log.Printf("❌ Database connection error: %v", err)
+		log.Printf("Database connection error: %v", err)
 		sendReply(bot, event.ReplyToken, "ไม่สามารถเชื่อมต่อฐานข้อมูลได้ กรุณาลองใหม่")
 		return
 	}
