@@ -8,6 +8,7 @@ package event
 // 	"nirun/pkg/database"
 // 	"nirun/pkg/flexmessage"
 // 	"nirun/pkg/models"
+// 	"nirun/service"
 // 	"regexp"
 // 	"strconv"
 // 	"unicode"
@@ -540,20 +541,15 @@ package event
 // 	}
 // 	log.Println("เลขประจำตัวประชาชน:", cardID)
 
-// 	// patient, err := service.PostRequestByID(cardID)
-// 	// if err != nil {
-// 	// 	log.Println("ErE:", err)
-// 	// 	return
-// 	// }
-// 	// log.Println("Papatient:", patient)
-// 	// ดึงข้อมูลผู้ป่วยจาก CardID
-// 	patient, err := GetPatientInfoByName(db, cardID)
+// 	patient, err := service.PostRequestPatientByID(cardID)
 // 	if err != nil {
-// 		log.Println("Error fetching patient info:", err)
-// 		sendReply(bot, event.ReplyToken, "ไม่พบข้อมูลผู้สูงอายุ กรุณากรอกเลขประจำตัวประชาชนอีกครั้ง")
+// 		log.Println("ErE:", err)
 // 		return
 // 	}
-// 	flexMessage := flexmessage.FormatPatientInfo(&patient.PatientInfo)
+// 	log.Println("Papatient:", patient)
+// 	// ดึงข้อมูลผู้ป่วยจาก CardID
+
+// 	flexMessage := flexmessage.FormatPatientInfo(patient)
 // 	if _, err := bot.PushMessage(userID, flexMessage).Do(); err != nil {
 // 		log.Println("Error sending push message:", err)
 // 	}
@@ -572,10 +568,10 @@ package event
 // }
 
 // // func parseDateInput(input string) (time.Time, error) {
-// // 	// 🔹 ลบช่องว่างส่วนเกิน และเปลี่ยนเป็น lower case
+// // 	// ลบช่องว่างส่วนเกิน และเปลี่ยนเป็น lower case
 // // 	input = strings.TrimSpace(strings.ToLower(input))
 
-// // 	// 🔹 กำหนด regex สำหรับจับวันและเดือน/ปี
+// // 	// กำหนด regex สำหรับจับวันและเดือน/ปี
 // // 	re := regexp.MustCompile(`^(\d{1,2})/(\d{1,2})/(\d{4})$`)
 // // 	match := re.FindStringSubmatch(input)
 
@@ -583,18 +579,18 @@ package event
 // // 		return time.Time{}, fmt.Errorf("รูปแบบวันที่ไม่ถูกต้อง กรุณากรอกเป็น วัน/เดือน/ปี เช่น 01/01/2567")
 // // 	}
 
-// // 	// 🔹 ดึงค่าจาก regex match
+// // 	// ดึงค่าจาก regex match
 // // 	day, month, yearStr := match[1], match[2], match[3]
 
-// // 	// 🔹 แปลงปีเป็น int
+// // 	// แปลงปีเป็น int
 // // 	year, _ := strconv.Atoi(yearStr)
 
-// // 	// 🔹 ตรวจสอบว่าปีเป็น พ.ศ. หรือไม่
+// // 	// ตรวจสอบว่าปีเป็น พ.ศ. หรือไม่
 // // 	if year > 2500 {
 // // 		year -= 543 // แปลง พ.ศ. → ค.ศ.
 // // 	}
 
-// // 	// 🔹 สร้างวันที่โดยไม่มีเวลา
+// // 	// สร้างวันที่โดยไม่มีเวลา
 // // 	dateStr := fmt.Sprintf("%s/%s/%d", day, month, year)
 // // 	layout := "02/01/2006"
 // // 	parsedDate, err := time.Parse(layout, dateStr)
@@ -606,10 +602,10 @@ package event
 // // }
 
 // // func parseTimeInput(input string) (time.Time, error) {
-// // 	// 🔹 ลบช่องว่างส่วนเกิน และเปลี่ยนเป็น lower case
+// // 	// ลบช่องว่างส่วนเกิน และเปลี่ยนเป็น lower case
 // // 	input = strings.TrimSpace(strings.ToLower(input))
 
-// // 	// 🔹 กำหนด regex สำหรับจับเวลา
+// // 	// กำหนด regex สำหรับจับเวลา
 // // 	re := regexp.MustCompile(`^(\d{1,2})[:.](\d{2})\s*(น\.?|น)?$`)
 // // 	match := re.FindStringSubmatch(input)
 
@@ -617,17 +613,16 @@ package event
 // // 		return time.Time{}, fmt.Errorf("รูปแบบเวลาไม่ถูกต้อง กรุณากรอกเป็น ชั่วโมง:นาที เช่น 11:20 น.")
 // // 	}
 
-// // 	// 🔹 ดึงค่าจาก regex match
+// // 	// ดึงค่าจาก regex match
 // // 	hour, min := match[1], match[2]
 
-// // 	// 🔹 แปลงค่าเป็นตัวเลข
+// // 	// แปลงค่าเป็นตัวเลข
 // // 	hourInt, _ := strconv.Atoi(hour)
 // // 	minInt, _ := strconv.Atoi(min)
 
-// // 	// 🔹 สร้างเวลา
+// // 	// สร้างเวลา
 // // 	return time.Date(0, 0, 0, hourInt, minInt, 0, 0, time.UTC), nil
 // // }
-
 
 // func handleServiceGetCardID(bot *linebot.Client, event *linebot.Event, State string) {
 // 	if userState[State] != "wait status handleServiceGetCardID" {
@@ -635,25 +630,25 @@ package event
 // 		return
 // 	}
 
-// 	db, err := database.ConnectToDB()
-// 	if err != nil {
-// 		log.Println("Database connection error:", err)
-// 		sendReply(bot, event.ReplyToken, "ไม่สามารถเชื่อมต่อฐานข้อมูลได้ กรุณาลองใหม่.")
-// 		return
-// 	}
-// 	defer db.Close()
+// 	// db, err := database.ConnectToDB()
+// 	// if err != nil {
+// 	// 	log.Println("Database connection error:", err)
+// 	// 	sendReply(bot, event.ReplyToken, "ไม่สามารถเชื่อมต่อฐานข้อมูลได้ กรุณาลองใหม่.")
+// 	// 	return
+// 	// }
+// 	// defer db.Close()
 
 // 	userID := event.Source.UserID
 
 // 	// ตรวจสอบสถานะการเช็คอินของพนักงาน
-// 	userInfo, err := GetUserInfoByLINEID(db, userID)
+// 	userInfo, err := service.GetUserInfoByLINEID(userID)
 // 	if err != nil {
 // 		log.Println("ไม่พบข้อมูลพนักงานที่เชื่อมโยงกับ LINE ID นี้.")
 // 		sendReply(bot, event.ReplyToken, "คุณยังไม่ได้ลงทะเบียนในระบบ กรุณาติดต่อผู้ดูแล.")
 // 		return
 // 	}
 
-// 	isCheckedIn, err := IsEmployeeCheckedIn(db, userInfo.UserInfo_ID)
+// 	isCheckedIn, err := service.IsEmployeeCheckedIn(userInfo.UserInfo_ID)
 // 	if err != nil {
 // 		log.Println("Error checking worktime status:", err)
 // 		sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการตรวจสอบสถานะการลงเวลาทำงาน กรุณาลองใหม่.")
@@ -683,13 +678,9 @@ package event
 // 	log.Println("เลขประจำตัวประชาชน:", cardID)
 
 // 	// ตรวจสอบว่ามีข้อมูลผู้ป่วยหรือไม่
-// 	if _, err := GetPatientInfoByName(db, cardID); err != nil {
-// 		if err == sql.ErrNoRows {
-// 			sendReply(bot, event.ReplyToken, "ไม่พบข้อมูลผู้สูงอายุ กรุณากรอกเลขประจำตัวประชาชนอีกครั้ง.")
-// 		} else {
-// 			log.Println("Error GetPatientInfoByName:", err)
-// 			sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการค้นหาข้อมูล กรุณาลองใหม่.")
-// 		}
+// 	patient, err := service.PostRequestPatientByID(cardID)
+// 	if err != nil || patient == nil {
+// 		sendReply(bot, event.ReplyToken, "ไม่พบข้อมูลผู้สูงอายุ กรุณากรอกเลขประจำตัวประชาชนอีกครั้ง")
 // 		return
 // 	}
 
@@ -755,209 +746,95 @@ package event
 // 		setUserState(State, "wait status ActivitySelection") // อัปเดตสถานะกลับไปเลือกมิติ
 // 		return
 // 	}
-// 	//ตรวจสอบมิติของกิจกรรม
-// 	validCategories := map[string]string{
-// 		"มิติเทคโนโลยี":   "technology",
-// 		"มิติสังคม":       "social",
-// 		"มิติสุขภาพ":      "health",
-// 		"มิติเศรษฐกิจ":    "economic",
-// 		"มิติสิ่งแวดล้อม": "environmental",
-// 		"มิติอื่นๆ":       "other",
+// 	//ตรวจสอบมิติของกิจกรรม`category_id`
+// 	categoryMapping := map[string]int{
+// 		"มิติสุขภาพ":      4,
+// 		"มิติสังคม":       5,
+// 		"มิติเศรษฐกิจ":    6,
+// 		"มิติสิ่งแวดล้อม": 7,
+// 		"มิติเทคโนโลยี":   8,
+// 		"มิติอื่นๆ":       9,
 // 	}
 
-// 	categoryKey, exists := validCategories[category]
-// 	log.Printf("categoryKey:%s", categoryKey)
-
+// 	categoryID, exists := categoryMapping[category]
 // 	if !exists {
 // 		sendReply(bot, event.ReplyToken, "กรุณาเลือกมิติของกิจกรรมที่ถูกต้องจากเมนู")
 // 		return
 // 	}
 
-// 	//อัปเดตหมวดหมู่ของกิจกรรมใน State
-// 	userActivityCategory[State] = categoryKey
-// 	log.Printf("userActivityCategory: %s", userActivityCategory)
+// 	// อัปเดตหมวดหมู่กิจกรรมใน State
+// 	userActivityCategory[State] = category
+// 	log.Printf("Updated user activity category: %s", category)
+// 	//ดึงกิจกรรมที่เกี่ยวข้องจาก API JSON-RPC และแสดงให้ผู้ใช้เลือก
+// 	fetchAndShowActivities(bot, event, State,categoryID)
 
-// 	if categoryKey == "other" {
+// 	if category == "9" {
 // 		//ให้ผู้ใช้กรอกกิจกรรมเอง
 // 		sendReply(bot, event.ReplyToken, "กรุณากรอกชื่อกิจกรรมของคุณ:")
 // 		userState[State] = "wait status CustomActivity"
 // 	} else {
-// 		//ดึงกิจกรรมที่เกี่ยวข้องจากฐานข้อมูลและแสดงให้ผู้ใช้เลือก
-// 		fetchAndShowActivities(bot, event, State, categoryKey)
+// 		//ดึงกิจกรรมที่เกี่ยวข้องจาก API JSON-RPC และแสดงให้ผู้ใช้เลือก
+// 		fetchAndShowActivities(bot, event, State, categoryID)
 // 	}
 // }
 
 // // ดึงกิจกรรมแต่ละมิติมาแสดงให้เลือก
-// func fetchAndShowActivities(bot *linebot.Client, event *linebot.Event, State string, category string) {
-// 	//อัปเดตหมวดหมู่กิจกรรมใน state
-// 	userActivityCategory[State] = category
-
-// 	//เชื่อมต่อฐานข้อมูล
-// 	db, err := database.ConnectToDB()
-// 	if err != nil {
-// 		log.Println("Database connection error:", err)
-// 		sendReply(bot, event.ReplyToken, "ไม่สามารถเชื่อมต่อฐานข้อมูลได้ กรุณาลองใหม่.")
-// 		return
-// 	}
-// 	defer db.Close()
-
-// 	var activities []string
-// 	//ดึงข้อมูลกิจกรรมตามหมวดหมู่จากฐานข้อมูล
-// 	switch category {
-// 	case "technology":
-// 		activityList, err := GetTechnologyActivities(db)
-// 		if err == nil {
-// 			for _, activity := range activityList {
-// 				activities = append(activities, strings.TrimSpace(activity.ActivityTechnology))
-// 			}
-// 			if len(activities) > 0 {
-// 				flexMessage := flexmessage.FormatActivitiestechnologyCarousel(activities)
-// 				if _, err := bot.PushMessage(event.Source.UserID, flexMessage).Do(); err != nil {
-// 					log.Println("Error sending activity list:", err)
-// 					sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการแสดงกิจกรรม กรุณาลองใหม่.")
-// 				}
-// 			} else {
-// 				sendReply(bot, event.ReplyToken, "ไม่พบกิจกรรมในหมวดหมู่นี้ กรุณาเลือกหมวดหมู่อื่น.")
-// 			}
-// 		}
-// 	case "social":
-// 		activityList, err := GetSocialActivities(db)
-// 		if err == nil {
-// 			for _, activity := range activityList {
-// 				activities = append(activities, strings.TrimSpace(activity.ActivitySocial))
-// 			}
-// 			if len(activities) > 0 {
-// 				flexMessage := flexmessage.FormatActivitiessocialCarousel(activities)
-// 				if _, err := bot.PushMessage(event.Source.UserID, flexMessage).Do(); err != nil {
-// 					log.Println("Error sending activity list:", err)
-// 					sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการแสดงกิจกรรม กรุณาลองใหม่.")
-// 				}
-// 			} else {
-// 				sendReply(bot, event.ReplyToken, "ไม่พบกิจกรรมในหมวดหมู่นี้ กรุณาเลือกหมวดหมู่อื่น.")
-// 			}
-// 		}
-// 	case "health":
-// 		activityList, err := GetHealthActivities(db)
-// 		if err == nil {
-// 			for _, activity := range activityList {
-// 				activities = append(activities, strings.TrimSpace(activity.ActivityHealth))
-// 			}
-
-// 			if len(activities) > 0 {
-// 				flexMessages := flexmessage.FormatActivitieshealthCarousel(activities)
-
-// 				// แปลง []*linebot.FlexMessage -> []linebot.SendingMessage
-// 				messages := make([]linebot.SendingMessage, len(flexMessages))
-// 				for i, msg := range flexMessages {
-// 					messages[i] = msg
-// 				}
-
-// 				if _, err := bot.PushMessage(event.Source.UserID, messages...).Do(); err != nil {
-// 					log.Println("Error sending activity list:", err)
-// 					sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการแสดงกิจกรรม กรุณาลองใหม่.")
-// 				}
-// 			} else {
-// 				sendReply(bot, event.ReplyToken, "ไม่พบกิจกรรมในหมวดหมู่นี้ กรุณาเลือกหมวดหมู่อื่น.")
-// 			}
-// 		} else {
-// 			log.Println("Error fetching activities:", err)
+// func fetchAndShowActivities(bot *linebot.Client, event *linebot.Event, State string, categoryID int) {
+// 		// อัปเดตหมวดหมู่กิจกรรมใน state
+// 		userActivityCategory[State] = fmt.Sprintf("%d", categoryID)
+	
+// 		// ใช้ API JSON-RPC เพื่อดึงรายการกิจกรรม
+// 		activityList, err := service.PostActivitiesByCategory(categoryID)
+// 		if err != nil {
+// 			log.Printf("❌ Error fetching activities from API: %v", err)
 // 			sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการดึงข้อมูลกิจกรรม กรุณาลองใหม่.")
+// 			return
 // 		}
-
-// 	case "economic":
-// 		activityList, err := GetEconomicActivities(db)
-// 		if err == nil {
-// 			for _, activity := range activityList {
-// 				activities = append(activities, strings.TrimSpace(activity.ActivityEconomic))
-// 			}
-// 			if len(activities) > 0 {
-// 				flexMessage := flexmessage.FormatActivitieseconomicCarousel(activities)
-// 				if _, err := bot.PushMessage(event.Source.UserID, flexMessage).Do(); err != nil {
-// 					log.Println("Error sending activity list:", err)
-// 					sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการแสดงกิจกรรม กรุณาลองใหม่.")
+	
+// 		// ตรวจสอบว่ามีกิจกรรมที่ดึงมาได้หรือไม่
+// 		if len(activityList) == 0 {
+// 			sendReply(bot, event.ReplyToken, "❌ ไม่พบกิจกรรมในหมวดหมู่นี้ กรุณาเลือกหมวดหมู่อื่น.")
+// 			return
+// 		}
+	
+// 		// เลือกใช้ Flex Message ตาม categoryID
+// 		var flexMessage *linebot.FlexMessage
+// 		switch categoryID {
+// 		case 4: // มิติสุขภาพ
+// 			flexMessages := flexmessage.FormatActivitieshealthCarousel(activityList)
+// 			// ส่ง Carousel แบบแยกเป็น 2 ชุด ถ้ามีมากกว่า 9 รายการ
+// 			for _, msg := range flexMessages {
+// 				if _, err := bot.PushMessage(event.Source.UserID, msg).Do(); err != nil {
+// 					log.Println("❌ Error sending activity list:", err)
 // 				}
-// 			} else {
-// 				sendReply(bot, event.ReplyToken, "ไม่พบกิจกรรมในหมวดหมู่นี้ กรุณาเลือกหมวดหมู่อื่น.")
 // 			}
+// 			return
+// 		case 5: // มิติสังคม
+// 			flexMessage = flexmessage.FormatActivitiessocialCarousel(activityList)
+// 		case 6: // มิติเศรษฐกิจ
+// 			flexMessage = flexmessage.FormatActivitieseconomicCarousel(activityList)
+// 		case 7: // มิติสิ่งแวดล้อม
+// 			flexMessage = flexmessage.FormatActivitiesenvironmentalCarousel(activityList)
+// 		case 8: // มิติเทคโนโลยี
+// 			flexMessage = flexmessage.FormatActivitiestechnologyCarousel(activityList)
+// 		default:
+// 			log.Printf("❌ Invalid category selection: %d", categoryID)
+// 			sendReply(bot, event.ReplyToken, "❌ หมวดหมู่กิจกรรมไม่ถูกต้อง กรุณาลองใหม่.")
+// 			return
 // 		}
-// 	case "environmental":
-// 		activityList, err := GetEnvironmentalActivities(db)
-// 		if err == nil {
-// 			for _, activity := range activityList {
-// 				activities = append(activities, strings.TrimSpace(activity.ActivityEnvironmental))
-// 			}
-// 			if len(activities) > 0 {
-// 				flexMessage := flexmessage.FormatActivitiesenvironmentalCarousel(activities)
-// 				if _, err := bot.PushMessage(event.Source.UserID, flexMessage).Do(); err != nil {
-// 					log.Println("Error sending activity list:", err)
-// 					sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการแสดงกิจกรรม กรุณาลองใหม่.")
-// 				}
-// 			} else {
-// 				sendReply(bot, event.ReplyToken, "ไม่พบกิจกรรมในหมวดหมู่นี้ กรุณาเลือกหมวดหมู่อื่น.")
-// 			}
+	
+// 		// 🔹 ส่ง Flex Message ไปยัง LINE Bot
+// 		if _, err := bot.PushMessage(event.Source.UserID, flexMessage).Do(); err != nil {
+// 			log.Println("❌ Error sending activity list:", err)
+// 			sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการแสดงกิจกรรม กรุณาลองใหม่.")
+// 			return
 // 		}
-// 	default:
-// 		log.Println("Invalid category selection:", category)
-// 		return
+	
+// 		// 🔹 อัปเดตสถานะเป็น "รอเลือกกิจกรรม"
+// 		setUserState(State, "wait status Activityrecord")
 // 	}
-// 	// //ดึงข้อมูลกิจกรรมตามหมวดหมู่จากฐานข้อมูล
-// 	// switch category {
-// 	// case "technology":
-// 	// 	activityList, err := GetTechnologyActivities(db)
-// 	// 	if err == nil {
-// 	// 		for _, activity := range activityList {
-// 	// 			activities = append(activities, strings.TrimSpace(activity.ActivityTechnology))
-// 	// 		}
-// 	// 	}
-// 	// case "social":
-// 	// 	activityList, err := GetSocialActivities(db)
-// 	// 	if err == nil {
-// 	// 		for _, activity := range activityList {
-// 	// 			activities = append(activities, strings.TrimSpace(activity.ActivitySocial))
-// 	// 		}
-// 	// 	}
-// 	// case "health":
-// 	// 	activityList, err := GetHealthActivities(db)
-// 	// 	if err == nil {
-// 	// 		for _, activity := range activityList {
-// 	// 			activities = append(activities, strings.TrimSpace(activity.ActivityHealth))
-// 	// 		}
-// 	// 	}
-// 	// case "economic":
-// 	// 	activityList, err := GetEconomicActivities(db)
-// 	// 	if err == nil {
-// 	// 		for _, activity := range activityList {
-// 	// 			activities = append(activities, strings.TrimSpace(activity.ActivityEconomic))
-// 	// 		}
-// 	// 	}
-// 	// case "environmental":
-// 	// 	activityList, err := GetEnvironmentalActivities(db)
-// 	// 	if err == nil {
-// 	// 		for _, activity := range activityList {
-// 	// 			activities = append(activities, strings.TrimSpace(activity.ActivityEnvironmental))
-// 	// 		}
-// 	// 	}
-// 	// default:
-// 	// 	log.Println("Invalid category selection:", category)
-// 	// 	return
-// 	// }
 
-// 	//แสดง Flex Message ให้ผู้ใช้เลือกกิจกรรม
-// 	// if len(activities) > 0 {
-// 	// 	flexMessage := flexmessage.FormatActivities(activities)
-// 	// 	if _, err := bot.PushMessage(event.Source.UserID, flexMessage).Do(); err != nil {
-// 	// 		log.Println("Error sending activity list:", err)
-// 	// 		sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการแสดงกิจกรรม กรุณาลองใหม่.")
-// 	// 	}
-// 	// } else {
-// 	// 	sendReply(bot, event.ReplyToken, "ไม่พบกิจกรรมในหมวดหมู่นี้ กรุณาเลือกหมวดหมู่อื่น.")
-// 	// }
-
-// 	//อัปเดตสถานะเป็น "รอเลือกกิจกรรม"
-// 	setUserState(State, "wait status Activityrecord")
-// }
-
-// // เลือกมิติอีกครั้งหากกดย้อนกลับ
+// // // เลือกมิติอีกครั้งหากกดย้อนกลับ
 // func sendActivityCategorySelection(bot *linebot.Client, event *linebot.Event) {
 // 	// log.Println("Sending activity category selection...")
 

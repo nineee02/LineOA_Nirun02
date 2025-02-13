@@ -37,6 +37,33 @@ func GetUserInfoByLINEID(db *sql.DB, lineUserID string) (*models.User_info, erro
 
 	return user, nil
 }
+func GetEmployeeByUserID(db *sql.DB, userID string) (*models.User_info, error) {
+	query := `
+        SELECT user_info_id, employee_info_id 
+        FROM user_info 
+        WHERE line_user_id = ?
+    `
+
+	var userInfo models.User_info
+	err := db.QueryRow(query, userID).Scan(&userInfo.UserInfo_ID, &userInfo.EmployeeInfo.EmployeeInfo_ID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			log.Printf("ไม่พบข้อมูล user_info สำหรับ userID: %s", userID)
+			return nil, fmt.Errorf("ไม่พบข้อมูลผู้ใช้ในระบบ")
+		}
+		log.Printf("เกิดข้อผิดพลาดในการดึงข้อมูล user_info: %v", err)
+		return nil, err
+	}
+
+	// ตรวจสอบว่า employee_info_id มีค่าหรือไม่
+	if userInfo.EmployeeInfo.EmployeeInfo_ID == 0 {
+		log.Printf("User %s ไม่ใช่พนักงาน (ไม่มี employee_info_id)", userID)
+		return nil, fmt.Errorf("คุณไม่มีสิทธิ์เป็นพนักงาน")
+	}
+
+	log.Printf("User %s เป็นพนักงาน (employee_info_id: %d)", userID, userInfo.EmployeeInfo.EmployeeInfo_ID)
+	return &userInfo, nil
+}
 
 // ตรวจสอบการเช็คอินของพนักงาน
 func IsEmployeeCheckedIn(db *sql.DB, userInfoID int) (bool, error) {
@@ -584,12 +611,16 @@ func GetActivityRecordID(db *sql.DB, cardID string) (*models.Activityrecord, err
 
 	return activityRecord, nil
 }
-func GetLatestActivityRecord(db *sql.DB, userID string) (*models.Activityrecord, error) {
+func GetLatestActivityRecord(db *sql.DB, patientInfoID int) (*models.Activityrecord, error) {
 	// ดึง patient_info_id จาก userID ก่อน
-	patientInfoID, err := GetPatientInfoByName(db, userID)
-	if err != nil {
-		log.Printf("ไม่พบข้อมูล patient_info_id สำหรับ UserID: %s", userID)
-		return nil, fmt.Errorf("ไม่พบข้อมูลผู้ป่วยสำหรับบัญชีนี้")
+	// patientInfoID, err := GetPatientInfoByName(db, userID)
+	// if err != nil {
+	// 	log.Printf("ไม่พบข้อมูล patient_info_id สำหรับ UserID: %s", userID)
+	// 	return nil, fmt.Errorf("ไม่พบข้อมูลผู้ป่วยสำหรับบัญชีนี้")
+	// }
+	if patientInfoID <= 0 {
+		log.Println("❌ Error: patientInfoID is invalid or missing")
+		return nil, fmt.Errorf("ไม่พบข้อมูลผู้ป่วย กรุณาลองใหม่")
 	}
 
 	// ค้นหากิจกรรมล่าสุดของ patient_info_id
@@ -602,7 +633,8 @@ func GetLatestActivityRecord(db *sql.DB, userID string) (*models.Activityrecord,
     `
 
 	activityRecord := &models.Activityrecord{}
-	err = db.QueryRow(query, patientInfoID).Scan(
+
+	err := db.QueryRow(query, patientInfoID).Scan(
 		&activityRecord.ActivityRecord_ID,
 		&activityRecord.PatientInfo.PatientInfo_ID,
 		&activityRecord.StartTime,
@@ -1124,10 +1156,72 @@ func GetEmployeeIDByName(db *sql.DB, employeeName string) (int, error) {
 //     return employeeID, nil
 // }
 
-func UpdateActivityEmployeeID(db *sql.DB, activityRecordID int, employeeID int, userInfoID int) error {
-	query := `UPDATE activity_record SET employee_info_id = ? WHERE activity_record_id = ?`
-	_, err := db.Exec(query, employeeID, userInfoID, activityRecordID)
-	return err
+func UpdateActivityEmployeeID(db *sql.DB, activity *models.Activityrecord) error {
+	// ✅ ตรวจสอบค่า employee_info_id ก่อนอัปเดต
+	log.Printf("🔍 ตรวจสอบค่าที่รับมา: patientInfoID=%d, employeeInfoID=%d, userInfoID=%d",
+		activity.PatientInfo.PatientInfo_ID, activity.EmployeeInfo.EmployeeInfo_ID, activity.UserInfo.UserInfo_ID)
+
+	// ✅ ตรวจสอบข้อมูลพื้นฐาน
+	if activity.PatientInfo.PatientInfo_ID == 0 {
+		return fmt.Errorf("❌ patient_info_id is invalid")
+	}
+	if activity.EmployeeInfo.EmployeeInfo_ID == 0 {
+		return fmt.Errorf("❌ employee_info_id is invalid")
+	}
+	if activity.UserInfo.UserInfo_ID == 0 {
+		return fmt.Errorf("❌ userInfo_id is invalid")
+	}
+
+	// ✅ ค้นหา activity_record_id ล่าสุดที่ยังไม่มี employee_info_id
+	var activityRecordID int
+	findQuery := `
+		SELECT activity_record_id 
+		FROM activity_record 
+		WHERE patient_info_id = ? 
+			AND employee_info_id IS NULL 
+		ORDER BY create_date DESC 
+		LIMIT 1;
+	`
+	err := db.QueryRow(findQuery, activity.PatientInfo.PatientInfo_ID).Scan(&activityRecordID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return fmt.Errorf("⚠️ ไม่พบกิจกรรมที่ต้องอัปเดต หรืออาจถูกอัปเดตไปแล้ว")
+		}
+		log.Printf("❌ SQL Execution error (finding latest activity record): %v", err)
+		return fmt.Errorf("❌ error fetching latest activity record: %v", err)
+	}
+
+	log.Printf("✅ พบ ActivityRecord_ID ที่ต้องอัปเดต: %d", activityRecordID)
+
+	// ✅ อัปเดต employee_info_id
+	updateQuery := `
+		UPDATE activity_record 
+		SET 
+			employee_info_id = ?, 
+			update_by = ?, 
+			update_date = NOW()
+		WHERE activity_record_id = ?;
+	`
+	result, err := db.Exec(updateQuery,
+		activity.EmployeeInfo.EmployeeInfo_ID, // รหัสพนักงาน
+		activity.UserInfo.UserInfo_ID,         // รหัสผู้ที่อัปเดต
+		activityRecordID,                      // รหัสกิจกรรมที่ต้องการอัปเดต
+	)
+
+	if err != nil {
+		log.Printf("❌ SQL Execution error (updating activity record): %v", err)
+		return fmt.Errorf("❌ error updating employee_info_id: %v", err)
+	}
+
+	rowsAffected, _ := result.RowsAffected()
+	log.Printf("✅ Rows affected: %d", rowsAffected)
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("⚠️ ไม่มีแถวที่ถูกอัปเดต ตรวจสอบเงื่อนไข WHERE")
+	}
+
+	log.Println("✅ อัปเดต employee_info_id สำเร็จ!")
+	return nil
 }
 func UpdateActivityEmployee(db *sql.DB, activity *models.Activityrecord) error {
 	// ตรวจสอบข้อมูลพื้นฐาน

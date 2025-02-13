@@ -263,9 +263,9 @@ package event
 // 		log.Printf("Error replying message sendCustomReply: %v", err)
 // 	}
 // }
-// func sendQRCodeForLogin(bot *linebot.Client, replyToken string) {
-// 	flexmessage.SendRegisterLink(bot, replyToken)
-// }
+// // func sendQRCodeForLogin(bot *linebot.Client, replyToken string) {
+// // 	flexmessage.SendRegisterLink(bot, replyToken)
+// // }
 
 // //*************************************************************************************************************
 

@@ -194,17 +194,12 @@ func handleWorktimeStste(bot *linebot.Client, event *linebot.Event, State string
 
 	// ตรวจสอบว่าผู้ใช้กดลงเวลางานซ้ำภายใน 40 นาทีหรือไม่
 	if isRecentWorktimeAction(userID) {
-		// ส่งข้อความถามยืนยัน พร้อมปุ่ม Quick Reply
-		quickReply := linebot.NewQuickReplyItems(
-			linebot.NewQuickReplyButton("", linebot.NewMessageAction("✅ ยืนยัน", "ยืนยันลงเวลางาน")),
-			linebot.NewQuickReplyButton("", linebot.NewMessageAction("❌ ยกเลิก", "ยกเลิก")),
-		)
+		// สร้าง Flex Message ถามยืนยัน
+		flexMessage := flexmessage.FormatWorktimeConfirmation()
 
-		replyMessage := linebot.NewTextMessage("คุณลงเวลางานเมื่อไม่นานมานี้ ต้องการดำเนินการต่อหรือไม่?").
-			WithQuickReplies(quickReply)
-
-		if _, err := bot.ReplyMessage(event.ReplyToken, replyMessage).Do(); err != nil {
-			log.Println("❌ Error sending Quick Reply message:", err)
+		// ส่ง Flex Message
+		if _, err := bot.ReplyMessage(event.ReplyToken, flexMessage).Do(); err != nil {
+			log.Println("❌ Error sending Flex Message:", err)
 		}
 
 		// ตั้งสถานะให้ผู้ใช้รอการยืนยัน
@@ -278,9 +273,10 @@ func sendCustomReply(bot *linebot.Client, replyToken string, userID string, gree
 		log.Printf("Error replying message sendCustomReply: %v", err)
 	}
 }
-func sendQRCodeForLogin(bot *linebot.Client, replyToken string) {
-	flexmessage.SendRegisterLink(bot, replyToken)
-}
+
+// func sendQRCodeForLogin(bot *linebot.Client, replyToken string) {
+// 	flexmessage.SendRegisterLink(bot, replyToken)
+// }
 
 //*************************************************************************************************************
 
@@ -331,7 +327,7 @@ func handleWorktime(bot *linebot.Client, event *linebot.Event, userID string) {
 	}
 	defer db.Close()
 
-	// ✅ ดึงข้อมูลผู้ใช้ตาม LINE ID
+	//ดึงข้อมูลผู้ใช้ตาม LINE ID
 	userInfo, err := GetUserInfoByLINEID(db, userID)
 	if err != nil {
 		log.Println("❌ Error fetching user info:", err)
@@ -339,7 +335,7 @@ func handleWorktime(bot *linebot.Client, event *linebot.Event, userID string) {
 		return
 	}
 
-	// ✅ ตรวจสอบการเช็คอินของพนักงาน
+	//ตรวจสอบการเช็คอินของพนักงาน
 	checkedIn, err := IsEmployeeCheckedIn(db, userInfo.UserInfo_ID)
 	if err != nil {
 		log.Println("❌ Error checking user status:", err)
@@ -356,7 +352,7 @@ func handleWorktime(bot *linebot.Client, event *linebot.Event, userID string) {
 		updateWorktimeAction(userID)
 		setUserState(userID, "wait status worktime")
 
-		// ✅ ตรวจสอบสถานะแล้วแสดงปุ่ม "เช็คอิน" หรือ "เช็คเอ้าท์"
+		// ตรวจสอบสถานะแล้วแสดงปุ่ม "เช็คอิน" หรือ "เช็คเอ้าท์"
 		UpdateWorktimeUI(bot, event, userInfo, checkedIn)
 
 	case "ยกเลิก":
@@ -379,7 +375,7 @@ func handleWorktime(bot *linebot.Client, event *linebot.Event, userID string) {
 // ฟังก์ชันยืนยันการลงเวลางาน
 func confirmWorktimeAction(bot *linebot.Client, event *linebot.Event, userID string, db *sql.DB, userInfo *models.User_info, checkedIn bool, message string) {
 	if message == "ยืนยันลงเวลางาน" {
-		log.Println("✅ User confirmed worktime action")
+		log.Println("User confirmed worktime action")
 		// อัปเดตสถานะการลงเวลางาน
 		updateWorktimeAction(userID)
 		setUserState(userID, "wait status worktime") // ตั้งสถานะเป็น worktime หลังจากยืนยัน
@@ -392,11 +388,11 @@ func confirmWorktimeAction(bot *linebot.Client, event *linebot.Event, userID str
 	}
 }
 
-// ✅ ฟังก์ชันบันทึก "เช็คอิน"
+// ฟังก์ชันบันทึก "เช็คอิน"
 func processCheckIn(bot *linebot.Client, event *linebot.Event, db *sql.DB, userInfo *models.User_info, userID string) {
 	err := RecordCheckIn(db, userInfo.UserInfo_ID)
 	if err != nil {
-		log.Println("❌ Error recording check-in:", err)
+		log.Println("Error recording check-in:", err)
 		sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการบันทึก Check-in กรุณาลองใหม่.")
 		return
 	}
@@ -406,7 +402,6 @@ func processCheckIn(bot *linebot.Client, event *linebot.Event, db *sql.DB, userI
 	setUserState(userID, "wait status checkOut")
 	log.Println("setUserState CheckOut", userID)
 
-	// ✅ ส่ง Flex Message
 	worktimeRecord := &models.WorktimeRecord{
 		UserInfo: &models.User_info{Name: userInfo.Name},
 		CheckIn:  time.Now(),
@@ -627,7 +622,6 @@ func isNumeric(s string) bool {
 // 	// 🔹 สร้างเวลา
 // 	return time.Date(0, 0, 0, hourInt, minInt, 0, 0, time.UTC), nil
 // }
-
 
 func handleServiceGetCardID(bot *linebot.Client, event *linebot.Event, State string) {
 	if userState[State] != "wait status handleServiceGetCardID" {
@@ -1007,7 +1001,7 @@ func handleCustomActivity(bot *linebot.Client, event *linebot.Event, State strin
 
 	//เปลี่ยนสถานะเป็น "รอเริ่มกิจกรรม"
 	userState[State] = "wait status ActivityStart"
-	sendReply(bot, event.ReplyToken, "กรุณากรอกวัน/เดือน/ปี เริ่มต้นของกิจกรรม\nเช่น 01/01/2567")
+	sendReply(bot, event.ReplyToken, "กรุณากรอกวันที่และเวลาสิ้นสุดของกิจกรรม\nเช่น 01/01/2567 11:20 น. หรือ\n01/01/2567 เวลา 11:20 น.")
 }
 
 // บันทึกกิจกรรม เมื่อเลือกกิจกรรมใหม่แล้ว
@@ -1151,36 +1145,34 @@ func handleActivityrecord(bot *linebot.Client, event *linebot.Event, State strin
 }
 
 func parseTimeInput(input string) (time.Time, error) {
-	// 🔹 ลบช่องว่างส่วนเกิน และเปลี่ยนเป็น lower case
+	// ลบช่องว่างและแปลงเป็น lower case
 	input = strings.TrimSpace(strings.ToLower(input))
 
-	// 🔹 กำหนด regex ให้รองรับทุกกรณี
-	re := regexp.MustCompile(`^(\d{1,2})/(\d{1,2})/(\d{4})\s*(เวลา)?\s*(\d{1,2})[:.](\d{2})\s*(น\.?|น)?$`)
+	// ใช้ regex จับรูปแบบ วัน/เดือน/ปี ชั่วโมง:นาที
+	re := regexp.MustCompile(`^(\d{1,2})/(\d{1,2})/(\d{4})\s*(?:เวลา)?\s*(\d{1,2})[:.](\d{2})\s*(?:น\.?|น)?$`)
 	match := re.FindStringSubmatch(input)
 
 	if len(match) == 0 {
 		return time.Time{}, fmt.Errorf("รูปแบบวันและเวลาไม่ถูกต้อง กรุณากรอกเป็น วัน/เดือน/ปี ชั่วโมง:นาที เช่น 01/01/2567 11:20 น.")
 	}
 
-	// 🔹 ดึงค่าจาก regex match
-	day, month, yearStr := match[1], match[2], match[3]
-	hour, min := match[5], match[6]
+	// ดึงค่าจาก regex match
+	day, _ := strconv.Atoi(match[1])
+	month, _ := strconv.Atoi(match[2])
+	year, _ := strconv.Atoi(match[3])
+	hour, _ := strconv.Atoi(match[4])
+	minute, _ := strconv.Atoi(match[5])
 
-	// 🔹 แปลงปีเป็น int
-	year, _ := strconv.Atoi(yearStr)
-
-	// 🔹 ตรวจสอบว่าปีเป็น พ.ศ. หรือไม่
+	// แปลง พ.ศ. เป็น ค.ศ.
 	if year > 2500 {
-		year -= 543 // แปลง พ.ศ. → ค.ศ.
+		year -= 543
 	}
 
-	// 🔹 ใช้ time.Parse() ตรวจสอบความถูกต้อง
-	dateTimeStr := fmt.Sprintf("%s/%s/%d %s:%s", day, month, year, hour, min)
-	layout := "02/01/2006 15:04"
-	parsedTime, err := time.Parse(layout, dateTimeStr)
-	if err != nil {
-		return time.Time{}, fmt.Errorf("ไม่สามารถแปลงวันและเวลาได้")
-	}
+	// กำหนดโซนเวลาเป็น Asia/Bangkok
+	loc, _ := time.LoadLocation("Asia/Bangkok")
+
+	// สร้าง time.Time ที่ถูกต้อง
+	parsedTime := time.Date(year, time.Month(month), day, hour, minute, 0, 0, loc)
 
 	return parsedTime, nil
 }
@@ -1210,8 +1202,8 @@ func handleActivityStart(bot *linebot.Client, event *linebot.Event, State string
 		return
 	}
 
-	now := time.Now()
-	startTime = time.Date(now.Year(), now.Month(), now.Day(), startTime.Hour(), startTime.Minute(), 0, 0, now.Location())
+	// now := time.Now()
+	// startTime = time.Date(now.Year(), now.Month(), now.Day(), startTime.Hour(), startTime.Minute(), 0, 0, now.Location())
 
 	db, err := database.ConnectToDB()
 	if err != nil {
@@ -1340,9 +1332,18 @@ func handleActivityEnd(bot *linebot.Client, event *linebot.Event, State string) 
 		sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการบันทึกเวลาสิ้นสุด กรุณาลองใหม่.")
 		return
 	}
-
-	// ส่งข้อความยืนยัน และขอให้ส่งรูปหลักฐาน
-	sendReply(bot, event.ReplyToken, fmt.Sprintf("กรุณาส่งรูปก่อนการทำกิจกรรม"))
+	// ส่ง Flex Message ยืนยันการบันทึกเวลา
+	startTimeStr := strings.TrimSpace(message.Text)
+	flexMessage, err := flexmessage.FormatActivityEndConfirmation(db, activityRecordID)
+	if err != nil {
+		log.Println("❌ Error formatting Flex Message:", err)
+		sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการสร้างข้อความ กรุณาลองใหม่.")
+		return
+	}
+	if _, err := bot.ReplyMessage(event.ReplyToken, flexMessage).Do(); err != nil {
+		log.Println("❌ Error sending Flex Message:", err)
+	}
+	log.Println("การบันทึกเวลา ", startTimeStr, endTimeStr)
 
 	// เปลี่ยนสถานะเป็น "wait status Saveavtivityend"
 	userState[State] = "wait status Saveavtivityend"
@@ -1350,6 +1351,7 @@ func handleActivityEnd(bot *linebot.Client, event *linebot.Event, State string) 
 
 // รับและประมวลผลรูปการทำกิจกรรม
 func handleSaveavtivityend(bot *linebot.Client, event *linebot.Event, cardID, userID string) {
+
 	if userState[userID] != "wait status Saveavtivityend" {
 		log.Printf("Invalid state for user %s. Current state: %s", userID, userState[userID])
 		sendReply(bot, event.ReplyToken, "สถานะของคุณไม่ถูกต้อง กรุณาลองใหม่.")
@@ -1545,7 +1547,12 @@ func handlesaveEvidenceImageafterActivity(bot *linebot.Client, event *linebot.Ev
 		// handleUserChoiceForActivityRecord(bot, event, userID, "ยืนยันการบันทึก")
 		log.Printf("User state updated to: %s", userState[userID])
 
-		sendReply(bot, event.ReplyToken, "เลือก 'ยืนยันการบันทึก' หรือ 'บันทึกข้อมูลแทน'  ")
+		// sendReply(bot, event.ReplyToken, "เลือก 'ยืนยันการบันทึก' หรือ 'บันทึกข้อมูลแทน'  ")
+		flexMessage := flexmessage.FormatConfirmactivity()
+		if _, err := bot.ReplyMessage(event.ReplyToken, flexMessage).Do(); err != nil {
+			log.Printf("Error sending reply message: %v", err)
+			// sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการส่งข้อความ กรุณาลองใหม่.")
+		}
 		return nil
 	}
 
@@ -1554,6 +1561,10 @@ func handlesaveEvidenceImageafterActivity(bot *linebot.Client, event *linebot.Ev
 	return nil
 }
 func handleUserChoiceForActivityRecord(bot *linebot.Client, event *linebot.Event, userID, selection string) {
+	log.Println("Start handleUserChoiceForActivityRecord...")
+	log.Println("UserID:", userID)
+	log.Println("Selection:", selection)
+	log.Println("UserIDState:", userState[userID])
 	if userState[userID] != "wait status ConfirmOrSaveEmployee" {
 		log.Printf("Invalid state for user %s. Current state: %s", userID, userState[userID])
 		return
@@ -1581,54 +1592,93 @@ func handleUserChoiceForActivityRecord(bot *linebot.Client, event *linebot.Event
 
 func confirmActivityRecordByUser(bot *linebot.Client, event *linebot.Event, userID string) {
 	if userState[userID] != "wait status confirmActivityRecordByUser" {
-		log.Printf("Invalid state for user %s. Current state: %s", userID, userState[userID])
+		log.Printf("❌ Invalid state for user %s. Current state: %s", userID, userState[userID])
 		return
 	}
 
 	db, err := database.ConnectToDB()
 	if err != nil {
-		log.Printf("Database connection error: %v", err)
+		log.Printf("❌ Database connection error: %v", err)
 		sendReply(bot, event.ReplyToken, "ไม่สามารถเชื่อมต่อฐานข้อมูลได้ กรุณาลองใหม่.")
 		return
 	}
 	defer db.Close()
 
-	// ดึง activity_record_id ที่เพิ่งบันทึก
-	activityRecord, err := GetLatestActivityRecord(db, userID)
-	if err != nil {
-		log.Printf("ไม่พบข้อมูลกิจกรรมสำหรับ UserID: %s", userID)
-		sendReply(bot, event.ReplyToken, "ไม่พบข้อมูลกิจกรรม กรุณาลองใหม่.")
+	// ✅ ดึง cardID จาก State
+	cardID, exists := usercardidState[userID]
+	if !exists || cardID == "" {
+		log.Printf("❌ ไม่พบข้อมูล cardID สำหรับ UserID: %s", userID)
+		sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาด ไม่พบข้อมูลบัตรประชาชน กรุณาลองใหม่.")
 		return
 	}
 
-	// ตรวจสอบสิทธิ์พนักงาน
-	userInfo, err := GetUserInfoByLINEID(db, userID)
+	// ✅ ดึง patient_info_id จาก cardID
+	patientInfoID, err := GetPatientInfoIDByCardID(db, cardID)
+	if err != nil {
+		log.Printf("❌ ไม่พบข้อมูล patient_info_id สำหรับ CardID: %s", cardID)
+		sendReply(bot, event.ReplyToken, "ไม่พบข้อมูลผู้ป่วย กรุณาลองใหม่.")
+		return
+	}
+	log.Printf("✅ patientInfoID: %d", patientInfoID)
+
+	// ✅ ดึง activity_record_id ล่าสุดของผู้ป่วยนี้
+	activityRecord, err := GetLatestActivityRecord(db, patientInfoID)
+	if err != nil {
+		log.Printf("❌ ไม่พบกิจกรรมล่าสุดสำหรับ PatientInfo_ID: %d", patientInfoID)
+		sendReply(bot, event.ReplyToken, "ไม่พบกิจกรรมที่สามารถยืนยันได้ กรุณาลองใหม่.")
+		return
+	}
+	log.Printf("✅ พบ ActivityRecord_ID: %d", activityRecord.ActivityRecord_ID)
+
+	// ✅ ตรวจสอบสิทธิ์พนักงาน
+	userInfo, err := GetEmployeeByUserID(db, userID)
 	if err != nil || userInfo.EmployeeInfo.EmployeeInfo_ID == 0 {
-		log.Printf("User %s is not an employee", userID)
-		sendReply(bot, event.ReplyToken, "คุณไม่มีสิทธิ์ยืนยัน กรุณาเลือก 'บันทึกข้อมูลแทน'")
+		log.Printf("❌ User %s ไม่มีสิทธิ์ยืนยันกิจกรรม", userID)
+		sendReply(bot, event.ReplyToken, "คุณไม่มีสิทธิ์ยืนยัน กรุณากรอกชื่อพนักงานเพื่อทำการยืนยัน")
+		handleSaveEmployeeName(bot, event, userID, userID, "")
+		saveActivityRecordForOtherEmployee(bot, event, userID)
 		return
 	}
 
-	// บันทึก employee_info_id ลง activity_record
-	err = UpdateActivityEmployeeID(db, activityRecord.ActivityRecord_ID, userInfo.EmployeeInfo.EmployeeInfo_ID, userInfo.UserInfo_ID)
+	// ✅ บันทึก employee_info_id ลง activity_record
+	activityRecord.EmployeeInfo.EmployeeInfo_ID = userInfo.EmployeeInfo.EmployeeInfo_ID
+	activityRecord.UserInfo.UserInfo_ID = userInfo.UserInfo_ID // ให้แน่ใจว่ามีค่า
+
+	log.Printf("📌 กำลังอัปเดต activityRecord_ID: %d ด้วย employee_info_id: %d โดย userInfo_ID: %d",
+		activityRecord.ActivityRecord_ID, activityRecord.EmployeeInfo.EmployeeInfo_ID, activityRecord.UserInfo.UserInfo_ID)
+
+	// ✅ เรียกฟังก์ชันอัปเดต
+	err = UpdateActivityEmployee(db, activityRecord)
 	if err != nil {
-		log.Printf("Error updating employee_info_id: %v", err)
+		log.Printf("❌ Error updating employee_info_id: %v", err)
 		sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการบันทึก กรุณาลองใหม่.")
 		return
 	}
 
-	sendReply(bot, event.ReplyToken, "บันทึกกิจกรรมสำเร็จ!")
+	// ✅ ส่งข้อความยืนยัน
+	flexMessage, err := flexmessage.FormatactivityRecordEndtime(db, activityRecord.ActivityRecord_ID)
+	if err != nil {
+		log.Printf("Error formatting Flex Message: %v", err)
+		sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการสร้างข้อความ กรุณาลองใหม่.")
+		return
+	}
+	if _, err := bot.ReplyMessage(event.ReplyToken, flexMessage).Do(); err != nil {
+		log.Printf("Error sending reply message: %v", err)
+		return
+	}
 	userState[userID] = ""
 }
 
 // ฟังก์ชันให้ผู้ใช้กรอกชื่อพนักงานแทน
 func saveActivityRecordForOtherEmployee(bot *linebot.Client, event *linebot.Event, userID string) {
+	log.Println("start saveActivityRecordForOtherEmployee...")
 	if userState[userID] != "wait status saveActivityRecordForOtherEmployee" {
 		log.Printf("Invalid state for user %s. Current state: %s", userID, userState[userID])
 		return
 	}
 
 	sendReply(bot, event.ReplyToken, "กรุณากรอกชื่อพนักงานที่ให้บริการแทน:")
+
 	userState[userID] = "wait status SaveEmployeeName"
 }
 
@@ -1699,7 +1749,6 @@ func handleSaveEmployeeName(bot *linebot.Client, event *linebot.Event, userID, S
 		EmployeeInfo: models.EmployeeInfo{EmployeeInfo_ID: employeeID},
 		UserInfo:     models.User_info{UserInfo_ID: userInfo.UserInfo_ID},
 	}
-	//เหลือแก้การดึงการคำนวณ
 	// startTime, err := GetActivityStartTime(db, cardID, userActivity[userID])
 	// if err != nil {
 	// 	log.Printf("Error fetching StartTime: %v", err)
@@ -1716,7 +1765,12 @@ func handleSaveEmployeeName(bot *linebot.Client, event *linebot.Event, userID, S
 		sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการบันทึกเวลาสิ้นสุด กรุณาลองใหม่")
 		return
 	}
-	flexMessage := flexmessage.FormatactivityRecordEndtime([]models.Activityrecord{*activityRecord})
+	flexMessage, err := flexmessage.FormatactivityRecordEmployee(db, activityRecord.ActivityRecord_ID)
+	if err != nil {
+		log.Printf("Error formatting Flex Message: %v", err)
+		sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการสร้างข้อความ กรุณาลองใหม่.")
+		return
+	}
 	if _, err := bot.ReplyMessage(event.ReplyToken, flexMessage).Do(); err != nil {
 		log.Printf("Error sending reply message: %v", err)
 		// sendReply(bot, event.ReplyToken, "เกิดข้อผิดพลาดในการส่งข้อความ กรุณาลองใหม่.")
@@ -1729,7 +1783,7 @@ func handleSaveEmployeeName(bot *linebot.Client, event *linebot.Event, userID, S
 	// 	return
 	// }
 
-	sendReply(bot, event.ReplyToken, "บันทึกข้อมูลพนักงานสำเร็จ!")
+	// sendReply(bot, event.ReplyToken, "บันทึกข้อมูลพนักงานสำเร็จ!")
 	userState[userID] = ""
 }
 

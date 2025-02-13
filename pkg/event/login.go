@@ -1,23 +1,23 @@
 package event
 
-const (
-	// 	clientID     = "2006767645"
-	// 	clientSecret = "68fd27f357fe6cc1c6ea782f1cb9819c"
-	redirectURI = "http://community.app.nirun.life/auth_oauth/signin"
-	clientID     = "2006878417"
-	clientSecret = "505aefd4da7ba032ab614c30c550164b"
-	state        = "random_string"
-	scope        = "profile openid email"
-)
+// const (
+// 	// 	clientID     = "2006767645"
+// 	// 	clientSecret = "68fd27f357fe6cc1c6ea782f1cb9819c"
+// 	redirectURI  = "http://community.app.nirun.life/auth_oauth/signin"
+// 	clientID     = "2006878417"
+// 	clientSecret = "505aefd4da7ba032ab614c30c550164b"
+// 	state        = "random_string"
+// 	scope        = "profile openid email"
+// )
 
-// LineLoginHandler สร้าง URL สำหรับ Line Login และ Redirect ผู้ใช้
+// // LineLoginHandler สร้าง URL สำหรับ Line Login และ Redirect ผู้ใช้
 // func LineLoginHandler(c *gin.Context) {
 // 	// escapedRedirectURI := url.QueryEscape(redirectURI) //ใช้ redirectURI ที่อัปเดตแล้ว
 
 // 	lineLoginURL := fmt.Sprintf(
 // 		"https://access.line.me/oauth2/v2.1/authorize?response_type=code&client_id=%s&redirect_uri=%s&state=%s&scope=%s&prompt=consent",
 // 		clientID, url.QueryEscape(redirectURI), state, url.QueryEscape(scope),
-// )
+// 	)
 // 	log.Println("Line Login URL:", lineLoginURL)
 // 	c.Redirect(http.StatusFound, lineLoginURL)
 // }
